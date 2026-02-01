@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QA Test Cases Generator - N8N Workflow Interface</title>
+    <link rel="stylesheet" href="src/css/main.css">
+    <!-- Pusher JS -->
+    <script src="https://js.pusher.com/8.4.0/pusher.min.js"></script>
+    <!-- Alpine.js 3.x CDN -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+
+<body>
+    <!-- Navigation Header -->
+    <nav class="navbar" x-data="{ mobileMenuOpen: false }">
+        <div class="navbar-container">
+            <div class="navbar-logo">
+                <img src="assets/images/logo-accor.png" alt="Accor Logo" class="logo-image">
+            </div>
+
+            <!-- Mobile Menu Button -->
+            <button @click="mobileMenuOpen = !mobileMenuOpen" class="mobile-menu-btn" :aria-expanded="mobileMenuOpen"
+                aria-label="Toggle menu">
+                <svg x-show="!mobileMenuOpen" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="3" y1="12" x2="21" y2="12"></line>
+                    <line x1="3" y1="6" x2="21" y2="6"></line>
+                    <line x1="3" y1="18" x2="21" y2="18"></line>
+                </svg>
+                <svg x-show="mobileMenuOpen" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+
+            <!-- Desktop Menu -->
+            <ul class="navbar-menu">
+                <li><a href="#conception" class="navbar-link active">Test cases</a></li>
+                <li><a href="#bugs" class="navbar-link">Bugs</a></li>
+                <li><a href="#dashboard" class="navbar-link">Dashboard</a></li>
+                <li><a href="#pv" class="navbar-link">PV</a></li>
+            </ul>
+        </div>
+
+        <!-- Mobile Menu Dropdown -->
+        <div x-show="mobileMenuOpen" x-transition class="mobile-menu" @click.away="mobileMenuOpen = false">
+            <a href="#conception" class="mobile-menu-link active">Test cases</a>
+            <a href="#bugs" class="mobile-menu-link">Bugs</a>
+            <a href="#dashboard" class="mobile-menu-link">Dashboard</a>
+            <a href="#pv" class="mobile-menu-link">PV</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1 class="title">Test Cases Generator</h1>
+            <p class="description">
+                Générez automatiquement des test cases end-to-end à partir de vos User Stories Jira.
+                Interface de déclenchement de workflows n8n pour projets hôteliers.
+            </p>
+        </header>
+
+        <!-- Main Form -->
+        <main class="main-content">
+            <div class="form-card" x-data="formHandler">
+                <!-- Loading Overlay with Progress Steps -->
+                <div x-show="loading" x-transition class="loading-overlay">
+                    <div class="progress-container">
+                        <h3 class="progress-title">Génération des test cases en cours</h3>
+
+                        <!-- Progress Steps -->
+                        <div class="progress-steps">
+                            <!-- Step 1: Tests Generated -->
+                            <div class="progress-step" :class="{'active': progressSteps.testsGenerated, 'completed': progressSteps.testsGenerated}">
+                                <div class="step-circle">
+                                    <span x-show="!progressSteps.testsGenerated" class="step-number">1</span>
+                                    <svg x-show="progressSteps.testsGenerated" class="step-check" width="24" height="24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                                        <polyline points="20 6 9 17 4 12"></polyline>
+                                    </svg>
+                                </div>
+                                <div class="step-content">
+                                    <p class="step-label">Génération des tests</p>
+                                    <p class="step-status" x-text="progressSteps.testsGenerated ? 'Terminé' : 'En cours...'"></p>
+                                </div>
+                            </div>
+
+                            <!-- Connector Line 1 -->
+                            <div class="step-connector" :class="{'completed': progressSteps.testsInserted}"></div>
+
+                            <!-- Step 2: Tests Inserted -->
+                            <div class="progress-step" :class="{'active': progressSteps.testsInserted, 'completed': progressSteps.testsInserted}">
+                                <div class="step-circle">
+                                    <span x-show="!progressSteps.testsInserted" class="step-number">2</span>
+                                    <svg x-show="progressSteps.testsInserted" class="step-check" width="24" height="24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                                        <polyline points="20 6 9 17 4 12"></polyline>
+                                    </svg>
+                                </div>
+                                <div class="step-content">
+                                    <p class="step-label">Insertion dans Jira</p>
+                                    <p class="step-status" x-text="progressSteps.testsInserted ? 'Terminé' : progressSteps.testsGenerated ? 'En cours...' : 'En attente'"></p>
+                                </div>
+                            </div>
+
+                            <!-- Connector Line 2 -->
+                            <div class="step-connector" :class="{'completed': progressSteps.testsLinked}"></div>
+
+                            <!-- Step 3: Tests Linked -->
+                            <div class="progress-step" :class="{'active': progressSteps.testsLinked, 'completed': progressSteps.testsLinked}">
+                                <div class="step-circle">
+                                    <span x-show="!progressSteps.testsLinked" class="step-number">3</span>
+                                    <svg x-show="progressSteps.testsLinked" class="step-check" width="24" height="24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                                        <polyline points="20 6 9 17 4 12"></polyline>
+                                    </svg>
+                                </div>
+                                <div class="step-content">
+                                    <p class="step-label">Liaison avec User Story</p>
+                                    <p class="step-status" x-text="progressSteps.testsLinked ? 'Terminé' : progressSteps.testsInserted ? 'En cours...' : 'En attente'"></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Overall Progress Bar -->
+                        <div class="progress-bar-container">
+                            <div class="progress-bar" :style="`width: ${overallProgress}%`"></div>
+                        </div>
+                        <p class="progress-percentage" x-text="`${overallProgress}% terminé`"></p>
+
+                        <!-- Success completion message and button -->
+                        <div x-show="progressSteps.testsLinked" x-transition class="completion-section">
+                            <div class="completion-message">
+                                <!-- <svg class="completion-icon" width="48" height="48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M22 11.08V12a10 10 0 0 0 10 10h.5"></path>
+                                    <path d="M12 11.08A10 10 0 0 0 2 12v8a10 10 0 0 0 10 10h8a10 10 0 0 0 10-10v-.5"></path>
+                                    <polyline points="9 11 12 14 22 4"></polyline>
+                                </svg> -->
+                                <h4 class="completion-title">Test cases générés avec succès !</h4>
+                                <p class="completion-text">Tous vos test cases ont été créés et liés à la User Story dans Jira.</p>
+                            </div>
+                            <button @click="resetAndClose" class="btn-new-tests">
+                                Générer de nouveaux tests
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Success Message (above form) -->
+                <div x-show="success" x-transition class="message message-success">
+                    <strong>✅ Succès !</strong>
+                    <p x-text="message"></p>
+                </div>
+
+                <!-- Error Message (above form) -->
+                <div x-show="error && formData.jira_key" x-transition class="message message-error">
+                    <strong>❌ Erreur</strong>
+                    <p x-text="message"></p>
+                </div>
+
+                <form @submit.prevent="submitForm" class="form">
+                    <!-- Jira ID Field -->
+                    <div class="form-group">
+                        <label for="us-jira-id" class="form-label">
+                            Jira User Story ID <span class="required">*</span>
+                        </label>
+                        <input type="text" id="us-jira-id" name="us-jira-id" x-model="formData.jira_key"
+                            placeholder="Ex: HOTEL-123" class="form-input"
+                            :class="{'input-error': error && !formData.jira_key}" :disabled="loading" required>
+                        <p x-show="error && !formData.jira_key" class="error-message">
+                            ❌ Le champ Jira ID est obligatoire
+                        </p>
+                    </div>
+
+                    <!-- Format Field -->
+                    <div class="form-group">
+                        <label for="format" class="form-label">
+                            Format de sortie
+                        </label>
+                        <select id="format" name="format" x-model="formData.format" class="form-select"
+                            :disabled="loading">
+                            <option value="gherkin">Gherkin</option>
+                            <option value="step-by-step">Step-by-step</option>
+                        </select>
+                    </div>
+
+                    <!-- Prompt Field -->
+                    <div class="form-group">
+                        <label for="prompt" class="form-label">
+                            Instruction complémentaire
+                        </label>
+                        <textarea id="prompt" name="prompt" x-model="formData.prompt"
+                            placeholder="Ex: Inclure les tests de validation des données, ajouter des cas limites..."
+                            class="form-textarea" rows="4" :disabled="loading"></textarea>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <button type="submit" class="btn-submit" :disabled="loading" :class="{'btn-loading': loading}">
+                        <span x-show="!loading">Générer les test cases</span>
+                        <span x-show="loading" class="loading-spinner">
+                            <span class="spinner"></span>
+                            Génération en cours...
+                        </span>
+                    </button>
+                </form>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Powered by <strong>n8n</strong> • Built with <strong>Alpine.js</strong></p>
+        </footer>
+    </div>
+
+    <!-- App Logic -->
+    <script type="module" src="src/js/app.js"></script>
+</body>
+
+</html>
