@@ -2,13 +2,14 @@
 // QA Test Cases Generator - Alpine.js Logic
 // ============================================
 
-// Configuration: URL du webhook n8n
-// Remplacer cette URL par votre instance n8n réelle
-// const N8N_WEBHOOK_URL = 'https://n8n.accor-ecom.fr/webhook-test/qa-agent';
-const N8N_WEBHOOK_URL = 'https://n8n.accor-ecom.fr/webhook-test/3e387bf6-3843-4851-8f0d-d3396ff9d159';
+// Configuration: URLs des webhooks n8n
+// Phase 1: Génération des test cases (retourne les test cases pour revue)
+const N8N_WEBHOOK_GENERATE_URL = 'https://n8n.accor-ecom.fr/webhook-test/case-writer';
+// Phase 2: Injection des test cases validés dans Xray
+const N8N_WEBHOOK_INJECT_URL = 'https://n8n.accor-ecom.fr/webhook-test/inject-testcases';
 
 // Configuration Pusher
-const PUSHER_APP_KEY = '285f4e972d37db4d1d3f';
+const PUSHER_APP_KEY = 'f07b39b2b4b01021840d';
 const PUSHER_CLUSTER = 'eu';
 
 // Debug mode
@@ -29,7 +30,7 @@ function generateChannelId() {
 
 // Génération du channel ID unique au chargement de la page
 // const CHANNEL_ID = generateChannelId();
-const CHANNEL_ID = (DEBUG_MODE) ? 'qa-channel-debug' : generateChannelId();
+const CHANNEL_ID = (DEBUG_MODE) ? 'qa-agent-front' : generateChannelId();
 console.log('📡 Channel ID generated:', CHANNEL_ID);
 
 // Initialisation Pusher
@@ -67,6 +68,12 @@ function initializePusher() {
             console.log('✅ Successfully subscribed to channel:', CHANNEL_ID);
         });
 
+        // DEBUG: Capturer TOUS les événements pour diagnostic
+        pusherChannel.bind_global((eventName, data) => {
+            console.log('🌐 [GLOBAL EVENT] Received:', eventName);
+            console.log('🌐 [GLOBAL EVENT] Data:', data);
+        });
+
         // Événement de souscription échouée
         pusherChannel.bind('pusher:subscription_error', (status) => {
             console.error('❌ Subscription error:', status);
@@ -92,6 +99,359 @@ function initializePusher() {
 // Initialisation Pusher immédiate (avant Alpine.js)
 initializePusher();
 
+// DEBUG: Exposer des fonctions de test dans la console
+window.debugPusher = {
+    getChannel: () => pusherChannel,
+    getInstance: () => pusherInstance,
+    getChannelId: () => CHANNEL_ID,
+    checkSubscription: () => {
+        console.log('📡 Channel:', pusherChannel);
+        console.log('📡 Channel subscribed:', pusherChannel?.subscribed);
+        console.log('📡 Connection state:', pusherInstance?.connection?.state);
+    },
+    simulateEvent: (eventName, data) => {
+        console.log(`🧪 Simulating event: ${eventName}`);
+        pusherChannel?.emit(eventName, data);
+    }
+};
+
+// ============================================
+// DEBUG UI - Mode debug pour développement CSS
+// Activé via ?debug=true dans l'URL
+// ============================================
+
+const urlParams = new URLSearchParams(window.location.search);
+const UI_DEBUG_MODE = urlParams.get('debug') === 'true' || urlParams.has('debug');
+const UI_DEBUG_SCREEN = urlParams.get('screen') || urlParams.get('debug');
+const UI_DEBUG_COUNT = parseInt(urlParams.get('n')) || 3;
+const UI_DEBUG_STEP = parseInt(urlParams.get('step')) || 0;
+
+/**
+ * Génère des test cases mockés réalistes pour le debug
+ * @param {number} count - Nombre de test cases à générer
+ * @returns {Array} Tableau de test cases au format Xray
+ */
+function generateMockTestCases(count = 3) {
+    const mockData = [
+        {
+            title: 'Vérifier la recherche de chambres disponibles',
+            gherkin: `Feature: Recherche de chambres disponibles
+
+Scenario: Recherche avec dates valides
+  Given l'utilisateur est sur la page d'accueil
+  When il sélectionne une date d'arrivée "2024-03-15"
+  And il sélectionne une date de départ "2024-03-18"
+  And il clique sur "Rechercher"
+  Then une liste de chambres disponibles s'affiche
+  And chaque chambre affiche son prix par nuit`,
+            type: 'Cucumber'
+        },
+        {
+            title: 'Valider le processus de réservation avec paiement par carte',
+            gherkin: `Feature: Processus de réservation
+
+Scenario: Réservation avec carte de crédit
+  Given l'utilisateur a sélectionné une chambre "Suite Deluxe"
+  And le prix affiché est "250€ par nuit"
+  When il remplit le formulaire de réservation
+  And il entre les informations de carte bancaire
+  And il clique sur "Confirmer la réservation"
+  Then un email de confirmation est envoyé
+  And le statut de la réservation est "Confirmée"`,
+            type: 'Cucumber'
+        },
+        {
+            title: 'Test d\'annulation de réservation dans les délais',
+            gherkin: `Feature: Annulation de réservation
+
+Scenario: Annulation gratuite sous 48h
+  Given l'utilisateur a une réservation active
+  And la date d'arrivée est dans plus de 48 heures
+  When il accède à "Mes réservations"
+  And il clique sur "Annuler"
+  And il confirme l'annulation
+  Then la réservation est annulée
+  And aucun frais n'est prélevé
+  And un email de confirmation d'annulation est envoyé`,
+            type: 'Cucumber'
+        },
+        {
+            title: 'Vérifier l\'affichage des équipements de la chambre',
+            gherkin: `Feature: Affichage des équipements
+
+Scenario: Liste des équipements visibles
+  Given l'utilisateur consulte une fiche chambre
+  When la page est complètement chargée
+  Then les équipements suivants sont affichés:
+    | WiFi gratuit |
+    | Climatisation |
+    | Mini-bar |
+    | Coffre-fort |
+  And chaque équipement a une icône associée`,
+            type: 'Cucumber'
+        },
+        {
+            title: 'Validation des champs obligatoires du formulaire client',
+            gherkin: `Feature: Validation formulaire client
+
+Scenario: Soumission avec champs manquants
+  Given l'utilisateur est sur le formulaire de réservation
+  When il laisse le champ "Email" vide
+  And il clique sur "Continuer"
+  Then un message d'erreur s'affiche sous le champ Email
+  And le message indique "Ce champ est obligatoire"
+  And le formulaire n'est pas soumis`,
+            type: 'Cucumber'
+        },
+        {
+            title: 'Test de connexion avec identifiants invalides',
+            gherkin: `Feature: Authentification utilisateur
+
+Scenario: Connexion échouée avec mauvais mot de passe
+  Given l'utilisateur est sur la page de connexion
+  When il entre l'email "test@hotel.com"
+  And il entre un mot de passe incorrect
+  And il clique sur "Se connecter"
+  Then un message d'erreur s'affiche
+  And le message indique "Identifiants incorrects"
+  And l'utilisateur reste sur la page de connexion`,
+            type: 'Cucumber'
+        },
+        {
+            title: 'Vérifier le calcul du prix total avec taxes',
+            gherkin: `Feature: Calcul du prix
+
+Scenario: Prix total avec TVA et taxe de séjour
+  Given l'utilisateur a sélectionné une chambre à 100€/nuit
+  And la durée du séjour est de 3 nuits
+  When le récapitulatif de prix s'affiche
+  Then le sous-total est "300€"
+  And la TVA (10%) est "30€"
+  And la taxe de séjour est "6€"
+  And le total est "336€"`,
+            type: 'Cucumber'
+        },
+        {
+            title: 'Test responsive sur mobile - Menu navigation',
+            gherkin: `Feature: Navigation mobile
+
+Scenario: Menu hamburger sur smartphone
+  Given l'utilisateur accède au site sur un écran 375px
+  When la page est chargée
+  Then le menu principal est masqué
+  And un bouton hamburger est visible
+  When l'utilisateur clique sur le bouton hamburger
+  Then le menu s'ouvre en overlay
+  And tous les liens de navigation sont accessibles`,
+            type: 'Manual'
+        },
+        {
+            title: 'Vérifier la persistance du panier',
+            gherkin: `Feature: Persistance panier
+
+Scenario: Panier conservé après rafraîchissement
+  Given l'utilisateur a ajouté une chambre au panier
+  When il rafraîchit la page
+  Then le panier contient toujours la chambre sélectionnée
+  And le prix affiché est identique`,
+            type: 'Cucumber'
+        },
+        {
+            title: 'Test de performance - Chargement page d\'accueil',
+            gherkin: `Feature: Performance
+
+Scenario: Temps de chargement acceptable
+  Given le cache du navigateur est vidé
+  When l'utilisateur accède à la page d'accueil
+  Then la page est interactive en moins de 3 secondes
+  And le Largest Contentful Paint est inférieur à 2.5s
+  And aucune erreur console n'est présente`,
+            type: 'Manual'
+        }
+    ];
+
+    const testCases = [];
+    for (let i = 0; i < count; i++) {
+        const mock = mockData[i % mockData.length];
+        testCases.push({
+            xray_issue_type: 'Test',
+            xray_testtype: mock.type,
+            xray_gherkin_def: mock.gherkin,
+            fields: {
+                summary: mock.title,
+                project: { key: 'HOTEL' },
+                issuetype: { name: 'Test' }
+            },
+            // Propriétés d'affichage pour l'interface
+            id: `tc-mock-${Date.now()}-${i}`,
+            selected: i !== 2, // Le 3ème est désélectionné pour tester le style
+            _displayTitle: mock.title,
+            _displaySteps: mock.gherkin,
+            _displayType: mock.type
+        });
+    }
+    return testCases;
+}
+
+// Référence au composant Alpine (sera définie après init)
+let alpineComponent = null;
+
+/**
+ * Interface de debug exposée globalement
+ */
+window.debugUI = {
+    /**
+     * Vérifie si le mode debug UI est actif
+     */
+    isActive: () => UI_DEBUG_MODE,
+
+    /**
+     * Retourne au formulaire initial
+     */
+    showForm: () => {
+        if (!alpineComponent) {
+            console.error('❌ Alpine component not ready');
+            return;
+        }
+        console.log('🔧 [DEBUG UI] Showing form');
+        alpineComponent.loading = false;
+        alpineComponent.reviewMode = false;
+        alpineComponent.injecting = false;
+        alpineComponent.error = false;
+        alpineComponent.success = false;
+        alpineComponent.testCases = [];
+        alpineComponent.formData.jira_key = '';
+    },
+
+    /**
+     * Affiche l'écran de chargement (génération)
+     */
+    showLoading: () => {
+        if (!alpineComponent) {
+            console.error('❌ Alpine component not ready');
+            return;
+        }
+        console.log('🔧 [DEBUG UI] Showing loading overlay');
+        alpineComponent.reviewMode = false;
+        alpineComponent.injecting = false;
+        alpineComponent.loading = true;
+        alpineComponent.formData.jira_key = 'HOTEL-123';
+    },
+
+    /**
+     * Affiche l'écran de revue avec des test cases mockés
+     * @param {number} count - Nombre de test cases (défaut: 3)
+     */
+    showReview: (count = 3) => {
+        if (!alpineComponent) {
+            console.error('❌ Alpine component not ready');
+            return;
+        }
+        console.log(`🔧 [DEBUG UI] Showing review with ${count} test cases`);
+        alpineComponent.loading = false;
+        alpineComponent.injecting = false;
+        alpineComponent.reviewMode = true;
+        alpineComponent.formData.jira_key = 'HOTEL-123';
+        alpineComponent.testCases = generateMockTestCases(count);
+        alpineComponent.editingIndex = null;
+    },
+
+    /**
+     * Affiche l'écran d'injection
+     * @param {number} step - Étape (0: initial, 1: insertion terminée, 2: tout terminé)
+     */
+    showInjection: (step = 0) => {
+        if (!alpineComponent) {
+            console.error('❌ Alpine component not ready');
+            return;
+        }
+        console.log(`🔧 [DEBUG UI] Showing injection at step ${step}`);
+        alpineComponent.loading = false;
+        alpineComponent.reviewMode = false;
+        alpineComponent.injecting = true;
+        alpineComponent.formData.jira_key = 'HOTEL-123';
+
+        // Reset les étapes
+        alpineComponent.injectionSteps.testsInserted = step >= 1;
+        alpineComponent.injectionSteps.testsLinked = step >= 2;
+
+        if (step >= 2) {
+            alpineComponent.success = true;
+            alpineComponent.message = 'Test cases injectés avec succès dans Xray !';
+        }
+    },
+
+    /**
+     * Force l'édition d'un test case spécifique
+     * @param {number} index - Index du test case à éditer
+     */
+    setEditing: (index) => {
+        if (!alpineComponent) {
+            console.error('❌ Alpine component not ready');
+            return;
+        }
+        if (!alpineComponent.reviewMode) {
+            console.warn('⚠️ Not in review mode, switching to review first');
+            window.debugUI.showReview(5);
+        }
+        console.log(`🔧 [DEBUG UI] Setting editing index to ${index}`);
+        alpineComponent.editingIndex = index;
+    },
+
+    /**
+     * Retourne les test cases mockés sans modifier l'état
+     * @param {number} count - Nombre de test cases
+     */
+    getMockTestCases: (count = 3) => generateMockTestCases(count),
+
+    /**
+     * Affiche l'état actuel du composant
+     */
+    getState: () => {
+        if (!alpineComponent) {
+            console.error('❌ Alpine component not ready');
+            return null;
+        }
+        return {
+            loading: alpineComponent.loading,
+            reviewMode: alpineComponent.reviewMode,
+            injecting: alpineComponent.injecting,
+            testCasesCount: alpineComponent.testCases.length,
+            editingIndex: alpineComponent.editingIndex,
+            injectionSteps: { ...alpineComponent.injectionSteps }
+        };
+    }
+};
+
+/**
+ * Crée le bandeau de debug flottant
+ */
+function createDebugBanner() {
+    if (!UI_DEBUG_MODE) return;
+
+    const banner = document.createElement('div');
+    banner.id = 'debug-banner';
+    banner.innerHTML = `
+        <span class="debug-label">🔧 DEBUG</span>
+        <button onclick="debugUI.showForm()">Form</button>
+        <button onclick="debugUI.showLoading()">Loading</button>
+        <button onclick="debugUI.showReview(3)">Review (3)</button>
+        <button onclick="debugUI.showReview(10)">Review (10)</button>
+        <button onclick="debugUI.showInjection(0)">Inject-0</button>
+        <button onclick="debugUI.showInjection(1)">Inject-1</button>
+        <button onclick="debugUI.showInjection(2)">Inject-2</button>
+        <button onclick="debugUI.setEditing(0)">Edit #1</button>
+    `;
+    document.body.appendChild(banner);
+    console.log('🔧 [DEBUG UI] Banner created');
+}
+
+// Créer le bandeau après le chargement du DOM
+if (UI_DEBUG_MODE) {
+    console.log('🔧 [DEBUG UI] Mode activated via URL parameter');
+    document.addEventListener('DOMContentLoaded', createDebugBanner);
+}
+
 // Initialisation Alpine.js
 document.addEventListener('alpine:init', () => {
     // Composant principal du formulaire
@@ -110,16 +470,35 @@ document.addEventListener('alpine:init', () => {
         message: '',
         pusherNotifications: [], // Stockage des notifications Pusher
 
-        // États des étapes de progression
+        // === PHASE DE REVUE ===
+        reviewMode: false, // Active l'interface de revue
+        testCases: [], // Test cases générés à valider
+        editingIndex: null, // Index du test case en cours d'édition
+        injecting: false, // État de chargement lors de l'injection
+
+        // États des étapes de progression (Phase 1: génération)
         progressSteps: {
             testsGenerated: false,
             testsInserted: false,
             testsLinked: false
         },
 
-        // Progression globale calculée
+        // États des étapes de progression (Phase 2: injection)
+        injectionSteps: {
+            testsInserted: false,
+            testsLinked: false
+        },
+
+        // Progression globale calculée (Phase 1: génération)
         get overallProgress() {
             const steps = Object.values(this.progressSteps);
+            const completed = steps.filter(step => step === true).length;
+            return Math.round((completed / steps.length) * 100);
+        },
+
+        // Progression de l'injection (Phase 2)
+        get injectionProgress() {
+            const steps = Object.values(this.injectionSteps);
             const completed = steps.filter(step => step === true).length;
             return Math.round((completed / steps.length) * 100);
         },
@@ -132,37 +511,80 @@ document.addEventListener('alpine:init', () => {
             console.log('📡 Pusher channel status:', pusherChannel ? 'Connected' : 'Not connected');
             console.log('🆔 Channel ID:', CHANNEL_ID);
 
+            // Capturer la référence pour debugUI
+            alpineComponent = this;
+
+            // Appliquer l'écran de debug si spécifié dans l'URL
+            if (UI_DEBUG_MODE && UI_DEBUG_SCREEN && UI_DEBUG_SCREEN !== 'true') {
+                setTimeout(() => {
+                    switch (UI_DEBUG_SCREEN) {
+                        case 'loading':
+                            window.debugUI.showLoading();
+                            break;
+                        case 'review':
+                            window.debugUI.showReview(UI_DEBUG_COUNT);
+                            break;
+                        case 'injection':
+                            window.debugUI.showInjection(UI_DEBUG_STEP);
+                            break;
+                        default:
+                            console.log(`🔧 [DEBUG UI] Unknown screen: ${UI_DEBUG_SCREEN}`);
+                    }
+                }, 100);
+            }
+
             // Vérifier que Pusher est bien initialisé
             if (!pusherChannel) {
                 console.error('❌ Pusher channel not initialized! Retrying...');
                 initializePusher();
             }
 
-            // Binding des événements Pusher pour les 3 étapes de progression
+            // Binding des événements Pusher
             if (pusherChannel) {
                 console.log('✅ Binding Pusher events...');
 
-                // Étape 1: Tests générés
-                pusherChannel.bind('tests-generated', (data) => {
-                    console.log('📝 Tests generated:', data);
-                    this.progressSteps.testsGenerated = true;
-                    this.handlePusherNotification(data);
-                });
+                // === PHASE 1: GÉNÉRATION ===
 
-                // Étape 2: Tests insérés dans Jira
+                // Étape 1: Tests générés - DÉCLENCHE LA REVUE
+                // Événement: 'cases-generated' avec payload au format Xray
+                console.log('🔗 Binding cases-generated event...');
+                const self = this; // Capture Alpine context explicitly
+                pusherChannel.bind('cases-generated', function(data) {
+                    console.log('📝 [HANDLER] Test cases generated (Xray format):', data);
+                    console.log('📝 [HANDLER] Alpine context (self):', self);
+                    console.log('📝 [HANDLER] reviewMode before:', self.reviewMode);
+                    self.progressSteps.testsGenerated = true;
+                    self.handlePusherNotification(data);
+                    // Passer en mode revue avec les test cases reçus
+                    self.enterReviewMode(data);
+                    console.log('📝 [HANDLER] reviewMode after:', self.reviewMode);
+                });
+                console.log('✅ cases-generated event bound');
+
+                // === PHASE 2: INJECTION (après validation utilisateur) ===
+
+                // Étape 2: Tests insérés dans Jira/Xray
                 pusherChannel.bind('tests-inserted', (data) => {
                     console.log('💾 Tests inserted in Jira:', data);
-                    this.progressSteps.testsInserted = true;
+                    if (this.injecting) {
+                        this.injectionSteps.testsInserted = true;
+                    } else {
+                        this.progressSteps.testsInserted = true;
+                    }
                     this.handlePusherNotification(data);
                 });
 
-                // Étape 3: Tests liés à la User Story
-                pusherChannel.bind('tests-linked', (data) => {
-                    console.log('🔗 Tests linked to User Story:', data);
-                    this.progressSteps.testsLinked = true;
+                // Étape 3: Tests injectés dans Xray et liés à la User Story
+                pusherChannel.bind('xray-injected', (data) => {
+                    console.log('🔗 Tests injected in Xray and linked to User Story:', data);
+                    if (this.injecting) {
+                        this.injectionSteps.testsLinked = true;
+                        this.handleInjectionComplete(data);
+                    } else {
+                        this.progressSteps.testsLinked = true;
+                        this.handleTestComplete(data);
+                    }
                     this.handlePusherNotification(data);
-                    // Processus complet
-                    this.handleTestComplete(data);
                 });
 
                 // Événement d'erreur
@@ -240,6 +662,13 @@ document.addEventListener('alpine:init', () => {
          * Gère la validation, l'envoi et les retours (succès/erreur)
          */
         async submitForm() {
+            // DEBUG: Vérifier l'état de Pusher avant soumission
+            console.log('🔍 [PRE-SUBMIT] Checking Pusher state...');
+            console.log('🔍 [PRE-SUBMIT] pusherChannel:', pusherChannel);
+            console.log('🔍 [PRE-SUBMIT] pusherChannel.subscribed:', pusherChannel?.subscribed);
+            console.log('🔍 [PRE-SUBMIT] pusherInstance.connection.state:', pusherInstance?.connection?.state);
+            console.log('🔍 [PRE-SUBMIT] channel_id being sent:', this.formData.channel_id);
+
             // Validation: champ jira_key obligatoire
             if (!this.formData.jira_key || this.formData.jira_key.trim() === '') {
                 this.error = true;
@@ -259,8 +688,8 @@ document.addEventListener('alpine:init', () => {
             console.log('🚀 Submitting form with data:', this.formData);
 
             try {
-                // Appel POST au webhook n8n avec le channel_id
-                const response = await fetch(N8N_WEBHOOK_URL, {
+                // Appel POST au webhook n8n Phase 1 (génération)
+                const response = await fetch(N8N_WEBHOOK_GENERATE_URL, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -330,6 +759,242 @@ document.addEventListener('alpine:init', () => {
                     firstInput.focus();
                 }
             }, 100);
+        },
+
+        // ============================================
+        // PHASE DE REVUE - Nouvelles méthodes
+        // ============================================
+
+        /**
+         * Entre en mode revue avec les test cases générés
+         * @param {Object|Array} data - Données reçues via Pusher contenant les test cases au format Xray
+         *
+         * Format attendu (Xray):
+         * [{ success, operation, channel, eventName, payload: [...testCases] }]
+         * ou directement un tableau de test cases
+         */
+        enterReviewMode(data) {
+            console.log('👀 Entering review mode with data:', data);
+            this.loading = false;
+            this.reviewMode = true;
+
+            let rawTestCases = [];
+
+            // Extraire les test cases selon la structure reçue
+            if (Array.isArray(data)) {
+                // Format: [{..., payload: [...]}] ou directement [testCase, testCase, ...]
+                if (data.length > 0 && data[0].payload && Array.isArray(data[0].payload)) {
+                    // Format Pusher avec wrapper: [{success, payload: [...]}]
+                    rawTestCases = data[0].payload;
+                } else if (data.length > 0 && data[0].xray_issue_type) {
+                    // Format direct: tableau de test cases Xray
+                    rawTestCases = data;
+                }
+            } else if (data.payload && Array.isArray(data.payload)) {
+                // Format objet avec payload
+                rawTestCases = data.payload;
+            } else if (data.testCases && Array.isArray(data.testCases)) {
+                // Format legacy
+                rawTestCases = data.testCases;
+            }
+
+            // Transformer les test cases Xray pour l'affichage tout en conservant la structure originale
+            this.testCases = rawTestCases.map((tc, index) => ({
+                // Conserver TOUTE la structure Xray originale pour l'injection
+                ...tc,
+                // Ajouter des propriétés pour l'interface de revue
+                id: `tc-${Date.now()}-${index}`,
+                selected: true,
+                // Propriétés d'affichage (mappées depuis le format Xray)
+                _displayTitle: tc.fields?.summary || 'Test case sans titre',
+                _displaySteps: tc.xray_gherkin_def || '',
+                _displayType: tc.xray_testtype || 'Cucumber'
+            }));
+
+            console.log(`✅ Loaded ${this.testCases.length} test cases for review (Xray format)`);
+        },
+
+        /**
+         * Démarre l'édition d'un test case
+         * @param {number} index - Index du test case à éditer
+         */
+        startEditing(index) {
+            console.log('✏️ Start editing test case at index:', index);
+            this.editingIndex = index;
+        },
+
+        /**
+         * Annule l'édition en cours
+         */
+        cancelEditing() {
+            console.log('❌ Cancel editing');
+            this.editingIndex = null;
+        },
+
+        /**
+         * Sauvegarde les modifications d'un test case
+         * @param {number} index - Index du test case modifié
+         */
+        saveEditing(index) {
+            console.log('💾 Save editing for test case at index:', index);
+            this.editingIndex = null;
+            // Les modifications sont déjà liées via x-model
+        },
+
+        /**
+         * Supprime un test case de la liste
+         * @param {number} index - Index du test case à supprimer
+         */
+        deleteTestCase(index) {
+            console.log('🗑️ Delete test case at index:', index);
+            this.testCases.splice(index, 1);
+        },
+
+        /**
+         * Bascule la sélection d'un test case
+         * @param {number} index - Index du test case
+         */
+        toggleTestCaseSelection(index) {
+            this.testCases[index].selected = !this.testCases[index].selected;
+        },
+
+        /**
+         * Sélectionne ou désélectionne tous les test cases
+         * @param {boolean} selectAll - true pour tout sélectionner, false pour tout désélectionner
+         */
+        selectAllTestCases(selectAll) {
+            this.testCases.forEach(tc => tc.selected = selectAll);
+        },
+
+        /**
+         * Retourne le nombre de test cases sélectionnés
+         */
+        get selectedTestCasesCount() {
+            return this.testCases.filter(tc => tc.selected).length;
+        },
+
+        /**
+         * Annule la revue et retourne au formulaire
+         */
+        cancelReview() {
+            console.log('❌ Cancel review, returning to form');
+            this.reviewMode = false;
+            this.testCases = [];
+            this.editingIndex = null;
+            this.resetProgressSteps();
+        },
+
+        /**
+         * Relance la génération des test cases
+         */
+        regenerateTestCases() {
+            console.log('🔄 Regenerating test cases');
+            this.reviewMode = false;
+            this.testCases = [];
+            this.editingIndex = null;
+            this.resetProgressSteps();
+            // Relancer la soumission
+            this.submitForm();
+        },
+
+        /**
+         * Valide et injecte les test cases sélectionnés dans Xray
+         * Envoie les test cases au format Xray original (sans les propriétés frontend)
+         */
+        async validateAndInject() {
+            const selectedTestCases = this.testCases.filter(tc => tc.selected);
+
+            if (selectedTestCases.length === 0) {
+                this.error = true;
+                this.message = 'Veuillez sélectionner au moins un test case à injecter.';
+                return;
+            }
+
+            console.log('🚀 Validating and injecting', selectedTestCases.length, 'test cases');
+
+            // Nettoyer les test cases pour ne garder que le format Xray original
+            const xrayTestCases = selectedTestCases.map(tc => {
+                // Créer une copie sans les propriétés frontend
+                const { id, selected, _displayTitle, _displaySteps, _displayType, ...xrayData } = tc;
+                return xrayData;
+            });
+
+            console.log('📤 Sending Xray payload:', xrayTestCases);
+
+            this.error = false;
+            this.message = '';
+            this.injecting = true;
+            this.reviewMode = false;
+            this.resetInjectionSteps();
+
+            try {
+                const response = await fetch(N8N_WEBHOOK_INJECT_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        jira_key: this.formData.jira_key.trim(),
+                        channel_id: this.formData.channel_id,
+                        testCases: xrayTestCases // Format Xray original
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.message || `Erreur HTTP ${response.status}`);
+                }
+
+                console.log('✅ Injection request sent successfully:', data);
+                // L'injection continue via les événements Pusher
+
+            } catch (err) {
+                console.error('❌ Error during injection:', err);
+                this.error = true;
+                this.injecting = false;
+                this.reviewMode = true; // Retourner en mode revue
+
+                if (err.name === 'TypeError' && err.message.includes('fetch')) {
+                    this.message = 'Erreur de connexion au serveur. Vérifiez votre connexion internet.';
+                } else {
+                    this.message = err.message || 'Une erreur est survenue lors de l\'injection.';
+                }
+            }
+        },
+
+        /**
+         * Réinitialise les étapes d'injection
+         */
+        resetInjectionSteps() {
+            this.injectionSteps.testsInserted = false;
+            this.injectionSteps.testsLinked = false;
+        },
+
+        /**
+         * Gère la fin de l'injection
+         */
+        handleInjectionComplete(data) {
+            console.log('✅ Injection complete:', data);
+            this.success = true;
+            this.error = false;
+            this.message = data.message || 'Test cases injectés avec succès dans Xray !';
+        },
+
+        /**
+         * Réinitialise tout après l'injection et ferme l'overlay
+         */
+        resetAfterInjection() {
+            console.log('🔄 Resetting after injection');
+            this.injecting = false;
+            this.success = false;
+            this.error = false;
+            this.message = '';
+            this.testCases = [];
+            this.editingIndex = null;
+            this.resetProgressSteps();
+            this.resetInjectionSteps();
+            this.resetForm();
         }
     }));
 });

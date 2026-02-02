@@ -8,6 +8,8 @@
     <link rel="stylesheet" href="src/css/main.css">
     <!-- Pusher JS -->
     <script src="https://js.pusher.com/8.4.0/pusher.min.js"></script>
+    <!-- App Logic (DOIT être chargé AVANT Alpine.js pour enregistrer les composants) -->
+    <script type="module" src="/src/js/app.js"></script>
     <!-- Alpine.js 3.x CDN -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
@@ -67,99 +69,193 @@
         <!-- Main Form -->
         <main class="main-content">
             <div class="form-card" x-data="formHandler">
-                <!-- Loading Overlay with Progress Steps -->
-                <div x-show="loading" x-transition class="loading-overlay">
+                <!-- Loading Overlay - Phase 1: Génération -->
+                <div x-cloak x-show="loading && !reviewMode && !injecting" x-transition class="loading-overlay">
                     <div class="progress-container">
                         <h3 class="progress-title">Génération des test cases en cours</h3>
 
+                        <div class="generation-loader">
+                            <div class="loader-spinner"></div>
+                            <p class="loader-text">L'IA analyse votre User Story et rédige les test cases...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Injection Overlay - Phase 2: Injection dans Xray -->
+                <div x-cloak x-show="injecting" x-transition class="loading-overlay">
+                    <div class="progress-container">
+                        <h3 class="progress-title">Injection des test cases dans Xray</h3>
+
                         <!-- Progress Steps -->
                         <div class="progress-steps">
-                            <!-- Step 1: Tests Generated -->
-                            <div class="progress-step" :class="{'active': progressSteps.testsGenerated, 'completed': progressSteps.testsGenerated}">
+                            <!-- Step 1: Tests Inserted -->
+                            <div class="progress-step" :class="{'active': !injectionSteps.testsInserted, 'completed': injectionSteps.testsInserted}">
                                 <div class="step-circle">
-                                    <span x-show="!progressSteps.testsGenerated" class="step-number">1</span>
-                                    <svg x-show="progressSteps.testsGenerated" class="step-check" width="24" height="24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                                    <span x-show="!injectionSteps.testsInserted" class="step-number">1</span>
+                                    <svg x-show="injectionSteps.testsInserted" class="step-check" width="24" height="24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
                                         <polyline points="20 6 9 17 4 12"></polyline>
                                     </svg>
                                 </div>
                                 <div class="step-content">
-                                    <p class="step-label">Génération des tests</p>
-                                    <p class="step-status" x-text="progressSteps.testsGenerated ? 'Terminé' : 'En cours...'"></p>
+                                    <p class="step-label">Insertion dans Xray</p>
+                                    <p class="step-status" x-text="injectionSteps.testsInserted ? 'Terminé' : 'En cours...'"></p>
                                 </div>
                             </div>
 
-                            <!-- Connector Line 1 -->
-                            <div class="step-connector" :class="{'completed': progressSteps.testsInserted}"></div>
+                            <!-- Connector Line -->
+                            <div class="step-connector" :class="{'completed': injectionSteps.testsLinked}"></div>
 
-                            <!-- Step 2: Tests Inserted -->
-                            <div class="progress-step" :class="{'active': progressSteps.testsInserted, 'completed': progressSteps.testsInserted}">
+                            <!-- Step 2: Tests Linked -->
+                            <div class="progress-step" :class="{'active': injectionSteps.testsInserted && !injectionSteps.testsLinked, 'completed': injectionSteps.testsLinked}">
                                 <div class="step-circle">
-                                    <span x-show="!progressSteps.testsInserted" class="step-number">2</span>
-                                    <svg x-show="progressSteps.testsInserted" class="step-check" width="24" height="24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-                                        <polyline points="20 6 9 17 4 12"></polyline>
-                                    </svg>
-                                </div>
-                                <div class="step-content">
-                                    <p class="step-label">Insertion dans Jira</p>
-                                    <p class="step-status" x-text="progressSteps.testsInserted ? 'Terminé' : progressSteps.testsGenerated ? 'En cours...' : 'En attente'"></p>
-                                </div>
-                            </div>
-
-                            <!-- Connector Line 2 -->
-                            <div class="step-connector" :class="{'completed': progressSteps.testsLinked}"></div>
-
-                            <!-- Step 3: Tests Linked -->
-                            <div class="progress-step" :class="{'active': progressSteps.testsLinked, 'completed': progressSteps.testsLinked}">
-                                <div class="step-circle">
-                                    <span x-show="!progressSteps.testsLinked" class="step-number">3</span>
-                                    <svg x-show="progressSteps.testsLinked" class="step-check" width="24" height="24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                                    <span x-show="!injectionSteps.testsLinked" class="step-number">2</span>
+                                    <svg x-show="injectionSteps.testsLinked" class="step-check" width="24" height="24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
                                         <polyline points="20 6 9 17 4 12"></polyline>
                                     </svg>
                                 </div>
                                 <div class="step-content">
                                     <p class="step-label">Liaison avec User Story</p>
-                                    <p class="step-status" x-text="progressSteps.testsLinked ? 'Terminé' : progressSteps.testsInserted ? 'En cours...' : 'En attente'"></p>
+                                    <p class="step-status" x-text="injectionSteps.testsLinked ? 'Terminé' : injectionSteps.testsInserted ? 'En cours...' : 'En attente'"></p>
                                 </div>
                             </div>
                         </div>
 
                         <!-- Overall Progress Bar -->
                         <div class="progress-bar-container">
-                            <div class="progress-bar" :style="`width: ${overallProgress}%`"></div>
+                            <div class="progress-bar" :style="`width: ${injectionProgress}%`"></div>
                         </div>
-                        <p class="progress-percentage" x-text="`${overallProgress}% terminé`"></p>
+                        <p class="progress-percentage" x-text="`${injectionProgress}% terminé`"></p>
 
-                        <!-- Success completion message and button -->
-                        <div x-show="progressSteps.testsLinked" x-transition class="completion-section">
+                        <!-- Success completion message -->
+                        <div x-show="injectionSteps.testsLinked" x-transition class="completion-section">
                             <div class="completion-message">
-                                <!-- <svg class="completion-icon" width="48" height="48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M22 11.08V12a10 10 0 0 0 10 10h.5"></path>
-                                    <path d="M12 11.08A10 10 0 0 0 2 12v8a10 10 0 0 0 10 10h8a10 10 0 0 0 10-10v-.5"></path>
-                                    <polyline points="9 11 12 14 22 4"></polyline>
-                                </svg> -->
-                                <h4 class="completion-title">Test cases générés avec succès !</h4>
-                                <p class="completion-text">Tous vos test cases ont été créés et liés à la User Story dans Jira.</p>
+                                <h4 class="completion-title">Test cases injectés avec succès !</h4>
+                                <p class="completion-text">Tous vos test cases ont été créés dans Xray et liés à la User Story.</p>
                             </div>
-                            <button @click="resetAndClose" class="btn-new-tests">
+                            <button @click="resetAfterInjection" class="btn-new-tests">
                                 Générer de nouveaux tests
                             </button>
                         </div>
                     </div>
                 </div>
 
+                <!-- Review Interface - Revue des test cases générés -->
+                <div x-cloak x-show="reviewMode" x-transition class="review-overlay">
+                    <div class="review-container">
+                        <div class="review-header">
+                            <h3 class="review-title">Revue des test cases</h3>
+                            <p class="review-subtitle">
+                                <span x-text="testCases.length"></span> test case(s) généré(s) pour
+                                <strong x-text="formData.jira_key"></strong>
+                            </p>
+                        </div>
+
+                        <!-- Error message in review mode -->
+                        <div x-cloak x-show="error" x-transition class="message message-error" style="margin-bottom: 16px;">
+                            <strong>Erreur</strong>
+                            <p x-text="message"></p>
+                        </div>
+
+                        <!-- Test Cases List -->
+                        <div class="review-list">
+                            <template x-for="(testCase, index) in testCases" :key="testCase.id">
+                                <div class="review-card" :class="{'editing': editingIndex === index, 'deselected': !testCase.selected}">
+                                    <!-- Card Header -->
+                                    <div class="review-card-header">
+                                        <label class="review-checkbox">
+                                            <input type="checkbox" :checked="testCase.selected" @change="toggleTestCaseSelection(index)">
+                                            <span class="checkmark"></span>
+                                        </label>
+                                        <span class="review-card-number" x-text="`#${index + 1}`"></span>
+                                        <div class="review-card-actions">
+                                            <button x-show="editingIndex !== index" @click="startEditing(index)" class="btn-icon btn-edit" title="Modifier">
+                                                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                                </svg>
+                                            </button>
+                                            <button @click="deleteTestCase(index)" class="btn-icon btn-delete" title="Supprimer">
+                                                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Card Content - View Mode (Format Xray) -->
+                                    <div x-show="editingIndex !== index" class="review-card-content">
+                                        <div class="review-card-title-row">
+                                            <h4 class="review-card-title" x-text="testCase._displayTitle"></h4>
+                                            <span class="review-card-badge" x-text="testCase._displayType"></span>
+                                        </div>
+                                        <div class="review-card-body">
+                                            <div class="review-section">
+                                                <strong>Gherkin:</strong>
+                                                <pre class="review-steps" x-text="testCase._displaySteps"></pre>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Card Content - Edit Mode (Format Xray) -->
+                                    <div x-show="editingIndex === index" class="review-card-edit">
+                                        <div class="edit-field">
+                                            <label class="edit-label">Titre (Summary)</label>
+                                            <input type="text" x-model="testCase.fields.summary" class="form-input"
+                                                @input="testCase._displayTitle = testCase.fields.summary">
+                                        </div>
+                                        <div class="edit-field">
+                                            <label class="edit-label">Définition Gherkin</label>
+                                            <textarea x-model="testCase.xray_gherkin_def" class="form-textarea" rows="10"
+                                                @input="testCase._displaySteps = testCase.xray_gherkin_def"></textarea>
+                                        </div>
+                                        <div class="edit-actions">
+                                            <button @click="cancelEditing" class="btn-secondary">Annuler</button>
+                                            <button @click="saveEditing(index)" class="btn-primary">Enregistrer</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <!-- Empty state -->
+                            <div x-show="testCases.length === 0" class="review-empty">
+                                <p>Aucun test case n'a été généré.</p>
+                            </div>
+                        </div>
+
+                        <!-- Review Actions -->
+                        <div class="review-actions">
+                            <div class="review-actions-left">
+                                <button @click="cancelReview" class="btn-secondary">
+                                    Annuler
+                                </button>
+                                <button @click="regenerateTestCases" class="btn-secondary">
+                                    Régénérer
+                                </button>
+                            </div>
+                            <div class="review-actions-right">
+                                <span class="selection-count" x-text="`${selectedTestCasesCount} / ${testCases.length} sélectionné(s)`"></span>
+                                <button @click="validateAndInject" class="btn-primary btn-inject" :disabled="selectedTestCasesCount === 0">
+                                    Valider et injecter dans Xray
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Success Message (above form) -->
-                <div x-show="success" x-transition class="message message-success">
-                    <strong>✅ Succès !</strong>
+                <div x-cloak x-show="success && !reviewMode && !injecting" x-transition class="message message-success">
+                    <strong>Succès !</strong>
                     <p x-text="message"></p>
                 </div>
 
                 <!-- Error Message (above form) -->
-                <div x-show="error && formData.jira_key" x-transition class="message message-error">
-                    <strong>❌ Erreur</strong>
+                <div x-cloak x-show="error && formData.jira_key && !reviewMode && !injecting" x-transition class="message message-error">
+                    <strong>Erreur</strong>
                     <p x-text="message"></p>
                 </div>
 
-                <form @submit.prevent="submitForm" class="form">
+                <form :class="{ 'form-hidden': reviewMode || injecting }" @submit.prevent="submitForm" class="form">
                     <!-- Jira ID Field -->
                     <div class="form-group">
                         <label for="us-jira-id" class="form-label">
@@ -213,8 +309,6 @@
         </footer>
     </div>
 
-    <!-- App Logic -->
-    <script type="module" src="src/js/app.js"></script>
 </body>
 
 </html>

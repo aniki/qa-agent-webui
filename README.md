@@ -173,6 +173,69 @@ Checklist de validation avant déploiement :
 - [ ] Le focus revient sur le premier champ après reset
 - [ ] Les états hover/focus sont visibles sur tous les éléments interactifs
 
+## 🔧 Mode Debug UI
+
+Un mode debug est disponible pour faciliter le développement et les tests CSS. Il permet d'afficher les différents écrans de l'application avec des données mockées sans avoir à exécuter le workflow complet.
+
+### Activation
+
+Ajoutez `?debug=true` à l'URL :
+
+```
+http://localhost:3000?debug=true
+```
+
+Un bandeau de debug apparaît en bas de l'écran avec des boutons pour naviguer entre les écrans.
+
+### Accès direct à un écran
+
+Vous pouvez ouvrir directement un écran spécifique via l'URL :
+
+| URL | Description |
+|-----|-------------|
+| `?debug=loading` | Écran de chargement (génération en cours) |
+| `?debug=review` | Écran de revue avec 3 test cases mockés |
+| `?debug=review&n=10` | Écran de revue avec 10 test cases |
+| `?debug=injection` | Écran d'injection (étape initiale) |
+| `?debug=injection&step=1` | Injection - étape 1 terminée |
+| `?debug=injection&step=2` | Injection - terminée avec succès |
+
+### Commandes Console
+
+En mode debug, l'objet `debugUI` est exposé dans la console :
+
+```javascript
+// Afficher les différents écrans
+debugUI.showForm()           // Formulaire initial
+debugUI.showLoading()        // Écran de chargement
+debugUI.showReview(5)        // Revue avec 5 test cases
+debugUI.showReview(10)       // Revue avec 10 test cases (test scroll)
+debugUI.showInjection(0)     // Injection - en cours
+debugUI.showInjection(1)     // Injection - étape 1 OK
+debugUI.showInjection(2)     // Injection - terminée
+
+// Utilitaires
+debugUI.setEditing(0)        // Active l'édition du test case #1
+debugUI.getState()           // Affiche l'état actuel du composant
+debugUI.getMockTestCases(5)  // Retourne 5 test cases mockés (sans changer l'UI)
+```
+
+### Données mockées
+
+Les test cases mockés incluent :
+- Des titres de longueurs variées
+- Du contenu Gherkin réaliste
+- Différents types (Cucumber, Manual)
+- Un test case désélectionné (pour tester le style `.deselected`)
+
+### Exemple de workflow debug
+
+1. Ouvrir `http://localhost:3000?debug=review&n=5`
+2. Inspecter les styles de `.review-card`
+3. Dans la console : `debugUI.setEditing(0)` pour tester le mode édition
+4. Ajuster le CSS
+5. `debugUI.showInjection(2)` pour vérifier l'écran de succès
+
 ## 🐛 Troubleshooting
 
 ### Erreur CORS
