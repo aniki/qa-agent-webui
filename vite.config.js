@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite'
+import { resolve } from 'path'
 
 export default defineConfig({
   // Serveur de développement
@@ -8,9 +9,9 @@ export default defineConfig({
     host: true  // Accessible sur le réseau local
   },
 
-  // Configuration du build pour la production
+  // Configuration du build pour la production (Web App)
   build: {
-    outDir: 'dist',
+    outDir: 'dist/web',
     // Inclure les assets dans le build
     rollupOptions: {
       input: 'index.html'
@@ -18,5 +19,12 @@ export default defineConfig({
   },
 
   // Pas de publicDir - les assets sont référencés directement
-  publicDir: false
+  publicDir: false,
+
+  // Aliases pour les imports
+  resolve: {
+    alias: {
+      '@core': resolve(__dirname, 'src/core')
+    }
+  }
 })

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QA Test Cases Generator</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="popup-container" id="app">
+        <!-- Header -->
+        <header class="popup-header">
+            <img src="../assets/icons/icon-48.png" alt="Logo" class="popup-logo">
+            <h1 class="popup-title">Test Cases Generator</h1>
+        </header>
+
+        <!-- Loading Overlay -->
+        <div id="loading-overlay" class="overlay hidden">
+            <div class="overlay-content">
+                <div class="spinner"></div>
+                <p class="overlay-text">Génération des test cases en cours...</p>
+                <p class="overlay-subtext">L'IA analyse votre User Story</p>
+            </div>
+        </div>
+
+        <!-- Injection Overlay -->
+        <div id="injection-overlay" class="overlay hidden">
+            <div class="overlay-content">
+                <h3 class="overlay-title">Injection dans Xray</h3>
+                <div class="progress-steps">
+                    <div class="step" id="step-insert">
+                        <div class="step-indicator">1</div>
+                        <span>Insertion</span>
+                    </div>
+                    <div class="step-line"></div>
+                    <div class="step" id="step-link">
+                        <div class="step-indicator">2</div>
+                        <span>Liaison US</span>
+                    </div>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+                <div id="injection-success" class="success-message hidden">
+                    <p>Test cases injectés avec succès !</p>
+                    <button id="btn-new-tests" class="btn btn-primary">Nouveau</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Review Mode -->
+        <div id="review-container" class="hidden">
+            <div class="review-header">
+                <h3>Revue des test cases</h3>
+                <p class="review-count"><span id="review-count">0</span> test case(s) pour <strong id="review-jira-key"></strong></p>
+            </div>
+            <div id="test-cases-list" class="test-cases-list">
+                <!-- Test cases will be inserted here -->
+            </div>
+            <div class="review-actions">
+                <button id="btn-cancel-review" class="btn btn-secondary">Annuler</button>
+                <div class="review-actions-right">
+                    <span id="selection-count">0/0</span>
+                    <button id="btn-inject" class="btn btn-primary">Injecter</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Form -->
+        <form id="generate-form" class="popup-form">
+            <!-- Auto-detected Jira info -->
+            <div id="jira-detected" class="jira-detected hidden">
+                <span class="jira-badge">Auto-détecté</span>
+                <span id="detected-jira-key" class="detected-key"></span>
+            </div>
+
+            <!-- Jira ID Field -->
+            <div class="form-group">
+                <label for="jira-key">Jira User Story ID *</label>
+                <input type="text" id="jira-key" name="jira-key" placeholder="HOTEL-123" required>
+                <p id="jira-error" class="error-message hidden">Le champ Jira ID est obligatoire</p>
+            </div>
+
+            <!-- Format Field -->
+            <div class="form-group">
+                <label for="format">Format de sortie</label>
+                <select id="format" name="format">
+                    <option value="gherkin">Gherkin</option>
+                    <option value="step-by-step">Step-by-step</option>
+                </select>
+            </div>
+
+            <!-- Prompt Field -->
+            <div class="form-group">
+                <label for="prompt">Instruction complémentaire</label>
+                <textarea id="prompt" name="prompt" rows="2" placeholder="Ex: Inclure les tests de validation..."></textarea>
+            </div>
+
+            <!-- Messages -->
+            <div id="message-success" class="message message-success hidden">
+                <p></p>
+            </div>
+            <div id="message-error" class="message message-error hidden">
+                <p></p>
+            </div>
+
+            <!-- Submit Button -->
+            <button type="submit" id="btn-submit" class="btn btn-primary btn-full">
+                Générer les test cases
+            </button>
+        </form>
+
+        <!-- Footer -->
+        <footer class="popup-footer">
+            <span>Powered by n8n</span>
+        </footer>
+    </div>
+
+    <script src="popup.js" type="module"></script>
+</body>
+</html>

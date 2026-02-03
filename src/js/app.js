@@ -2,21 +2,21 @@
 // QA Test Cases Generator - Alpine.js Logic
 // ============================================
 
+// Debug mode
+const DEBUG_MODE = false;
+if (DEBUG_MODE) {
+    console.log('🔧 Debug mode is ON');
+}
+
 // Configuration: URLs des webhooks n8n
 // Phase 1: Génération des test cases (retourne les test cases pour revue)
-const N8N_WEBHOOK_GENERATE_URL = 'https://n8n.accor-ecom.fr/webhook-test/case-writer';
+const N8N_WEBHOOK_GENERATE_URL = `https://n8n.accor-ecom.fr/webhook${DEBUG_MODE?'-test':''}/case-writer`;
 // Phase 2: Injection des test cases validés dans Xray
-const N8N_WEBHOOK_INJECT_URL = 'https://n8n.accor-ecom.fr/webhook-test/inject-testcases';
+const N8N_WEBHOOK_INJECT_URL = `https://n8n.accor-ecom.fr/webhook${DEBUG_MODE?'-test':''}/inject-testcases`;
 
 // Configuration Pusher
 const PUSHER_APP_KEY = 'f07b39b2b4b01021840d';
 const PUSHER_CLUSTER = 'eu';
-
-// Debug mode
-const DEBUG_MODE = true;
-if (DEBUG_MODE) {
-    console.log('🔧 Debug mode is ON');
-}
 
 /**
  * Génère un identifiant unique pour le channel Pusher

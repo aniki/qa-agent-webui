@@ -1,292 +1,284 @@
 # 🧪 QA Test Cases Generator
 
-Interface web pour déclencher des workflows n8n de génération automatique de test cases end-to-end à partir d'User Stories Jira pour projets hôteliers.
+Interface web et extension Chrome pour déclencher des workflows n8n de génération automatique de test cases end-to-end à partir d'User Stories Jira pour projets hôteliers.
 
 ## 📋 Description
 
-Cette application web permet aux QA engineers de générer des test cases automatiquement en soumettant simplement un ID de User Story Jira. L'application communique avec un workflow n8n via webhook pour orchestrer la génération des test cases au format Gherkin ou Step-by-step.
+Cette application permet aux QA engineers de générer des test cases automatiquement en soumettant simplement un ID de User Story Jira. L'application communique avec un workflow n8n via webhook pour orchestrer la génération des test cases au format Gherkin ou Step-by-step.
+
+**Disponible en deux versions :**
+- 🌐 **Web App** : Application web responsive déployable sur Netlify
+- 🧩 **Extension Chrome** : Popup intégrée avec auto-détection de l'ID Jira depuis l'onglet actif
 
 **Contexte métier :** Projet hôtelier de réservation de chambres nécessitant des tests end-to-end automatisés.
 
 ## 🚀 Fonctionnalités
 
+### Communes (Web + Extension)
 - ✅ Formulaire simple avec validation côté client
 - ✅ Champ obligatoire : Jira User Story ID (format: PROJ-123)
 - ✅ Sélection du format de sortie (Gherkin par défaut, ou Step-by-step)
 - ✅ États visuels clairs : loading, success, error
-- ✅ Messages d'erreur explicites et actionnables
-- ✅ Réinitialisation automatique après succès
-- ✅ Design responsive mobile-first
-- ✅ 100% client-side (aucune dépendance serveur)
+- ✅ Revue et édition des test cases avant injection
+- ✅ Injection dans Xray avec suivi de progression temps réel (Pusher)
+
+### Extension Chrome uniquement
+- ✅ Auto-détection de l'ID Jira depuis l'onglet actif
+- ✅ Notifications système à la fin de l'injection
+- ✅ Sauvegarde des préférences utilisateur
+- ✅ Bouton contextuel sur les pages Jira
 
 ## 🛠️ Stack Technique
 
-- **Framework JS** : Alpine.js 3.x (via CDN)
+- **Framework JS** : Alpine.js 3.x (CDN pour web, bundlé pour extension)
+- **Real-time** : Pusher pour les notifications temps réel
+- **Build** : Vite 5.x avec configurations séparées web/extension
 - **HTML/CSS** : Vanilla, sémantique HTML5
-- **Déploiement** : Netlify (static site)
-- **Backend** : Webhook n8n
-- **Build process** : Aucun (fichiers statiques prêts à déployer)
+- **Déploiement Web** : Netlify (static site)
+- **Déploiement Extension** : Chrome Web Store
+- **Backend** : Webhooks n8n
 
 ## 📁 Structure du Projet
 
 ```
 qa-agent-front/
-├── index.html              # Point d'entrée principal
+├── index.html                    # Point d'entrée web
+├── package.json                  # Scripts npm (dev, build:web, build:extension)
+├── vite.config.js                # Config Vite pour web
+├── vite.config.extension.js      # Config Vite pour extension Chrome
+│
 ├── src/
-│   ├── js/
-│   │   └── app.js         # Logique Alpine.js + appels API
-│   └── css/
-│       └── main.css       # Styles responsive vanilla CSS
-├── CLAUDE.md              # Conventions et architecture
-└── README.md              # Ce fichier
+│   ├── core/                     # 🔧 Code partagé (web + extension)
+│   │   ├── index.js              # Ré-exports de tous les modules
+│   │   ├── constants.js          # URLs webhooks, clés Pusher, config
+│   │   ├── api.js                # Appels HTTP (generate, inject)
+│   │   ├── pusher.js             # Gestion Pusher
+│   │   └── testcase-utils.js     # Utilitaires test cases (parse, transform)
+│   │
+│   ├── web/                      # 🌐 Spécifique webapp
+│   │   └── app.js                # Composant Alpine.js + debug UI
+│   │
+│   ├── extension/                # 🧩 Spécifique extension Chrome
+│   │   ├── manifest.json         # Manifest V3
+│   │   ├── popup/
+│   │   │   ├── popup.html        # Interface popup
+│   │   │   ├── popup.js          # Logique popup
+│   │   │   └── popup.css         # Styles popup (compacts)
+│   │   ├── background/
+│   │   │   └── service-worker.js # Service worker (notifications)
+│   │   ├── content/
+│   │   │   └── content.js        # Content script (pages Jira)
+│   │   └── assets/
+│   │       └── icons/            # Icônes 16/48/128px
+│   │
+│   ├── css/
+│   │   └── main.css              # Styles web app
+│   └── js/
+│       └── app.js                # (Legacy) Redirigé vers src/web/app.js
+│
+├── assets/                       # Assets statiques (images, logos)
+├── dist/                         # 📦 Builds générés
+│   ├── web/                      # Build webapp (Netlify)
+│   └── extension/                # Build extension (Chrome)
+│
+├── CLAUDE.md                     # Conventions et architecture
+└── README.md                     # Ce fichier
 ```
 
-## ⚙️ Installation
+## ⚙️ Installation & Développement
 
-### Option 1 : Déploiement Netlify (Recommandé)
-
-1. **Drag & Drop**
-   - Allez sur [Netlify](https://app.netlify.com/)
-   - Glissez-déposez le dossier `qa-agent-front/` dans la zone de drop
-   - Attendez le déploiement automatique (< 1 minute)
-   - Votre site est en ligne ! 🎉
-
-2. **Via Git (méthode alternative)**
-   ```bash
-   # Pousser votre code sur GitHub
-   git init
-   git add .
-   git commit -m "Initial commit"
-   git remote add origin <your-repo-url>
-   git push -u origin main
-
-   # Sur Netlify : New site from Git > Sélectionner votre repo
-   # Build settings: laisser vide (site statique)
-   # Publish directory: .
-   ```
-
-### Option 2 : Développement Local
-
-Ouvrez simplement `index.html` dans votre navigateur :
+### Prérequis
 
 ```bash
-# Avec un serveur local (recommandé pour éviter les CORS)
-npx serve .
+# Node.js 18+ requis
+node --version
 
-# Ou directement dans le navigateur
-open index.html
+# Installer les dépendances
+npm install
 ```
 
-## 🔧 Configuration n8n Webhook
+### Développement Web App
 
-### 1. Configurer l'URL du Webhook
+```bash
+# Démarrer le serveur de développement (port 3000)
+npm run dev
 
-Ouvrez `src/js/app.js` et remplacez la constante en haut du fichier :
+# Build pour production
+npm run build:web
+
+# Les fichiers sont générés dans dist/web/
+```
+
+### Développement Extension Chrome
+
+```bash
+# Build avec watch (recompile automatiquement)
+npm run dev:extension
+
+# Build pour production
+npm run build:extension
+
+# Les fichiers sont générés dans dist/extension/
+```
+
+#### Charger l'extension en développement
+
+1. Ouvrir `chrome://extensions/`
+2. Activer le "Mode développeur" (en haut à droite)
+3. Cliquer "Charger l'extension non empaquetée"
+4. Sélectionner le dossier `dist/extension/`
+5. L'extension apparaît dans la barre d'outils
+
+### Build complet (Web + Extension)
+
+```bash
+npm run build:all
+
+# Génère :
+# - dist/web/      → Déployer sur Netlify
+# - dist/extension/ → Publier sur Chrome Web Store
+```
+
+## 🔧 Configuration
+
+### URLs des Webhooks n8n
+
+Modifier dans `src/core/constants.js` :
 
 ```javascript
-// Remplacer cette URL par votre instance n8n réelle
-const N8N_WEBHOOK_URL = 'https://your-n8n-instance.com/webhook/generate-testcases';
+export const N8N_WEBHOOK_GENERATE_URL = 'https://your-n8n.com/webhook/case-writer';
+export const N8N_WEBHOOK_INJECT_URL = 'https://your-n8n.com/webhook/inject-testcases';
 ```
 
-### 2. Format du Payload Envoyé
+### Configuration Pusher
 
-L'application envoie un POST avec ce payload JSON :
-
-```json
-{
-  "usJiraId": "HOTEL-123",
-  "format": "gherkin"
-}
+```javascript
+export const PUSHER_APP_KEY = 'your-pusher-key';
+export const PUSHER_CLUSTER = 'eu';
 ```
 
-### 3. Réponse Attendue du Webhook
+### Icônes Extension
 
-Votre workflow n8n doit retourner :
+Ajouter les fichiers PNG dans `src/extension/assets/icons/` :
+- `icon-16.png` (16x16)
+- `icon-48.png` (48x48)
+- `icon-128.png` (128x128)
 
-```json
-{
-  "success": true,
-  "message": "Test cases générés avec succès",
-  "jobId": "uuid-v4"
-}
-```
+## 🎨 Personnalisation
 
-En cas d'erreur, retournez un statut HTTP 4xx/5xx avec :
+### Variables CSS (Web App)
 
-```json
-{
-  "success": false,
-  "message": "Message d'erreur explicite"
-}
-```
-
-### 4. Configuration CORS sur n8n
-
-Assurez-vous que votre workflow n8n accepte les requêtes CORS depuis votre domaine Netlify :
-
-1. Dans n8n, allez dans Settings > Workflow Settings
-2. Ajoutez votre domaine Netlify aux origines autorisées
-3. Ou configurez les headers CORS dans votre workflow (nœud HTTP Response)
-
-## 🎨 Personnalisation du Design
-
-### Couleurs
-
-Modifiez les variables CSS dans `src/css/main.css` :
+Modifier dans `src/css/main.css` :
 
 ```css
 :root {
-    --color-primary: #007bff;      /* Couleur principale */
-    --color-success: #28a745;      /* Vert succès */
-    --color-error: #dc3545;        /* Rouge erreur */
-    --color-bg: #f8f9fa;           /* Fond page */
-    /* ... */
+    --color-primary: #2d2d5f;
+    --color-success: #28a745;
+    --color-error: #dc3545;
+    --color-bg: #f8f9fa;
 }
 ```
 
-### Textes et Labels
+### Variables CSS (Extension)
 
-Modifiez directement dans `index.html` :
-- Titre H1 : ligne 27
-- Description : ligne 28-31
-- Labels de formulaire : lignes 39, 56
+Modifier dans `src/extension/popup/popup.css` - mêmes variables disponibles.
 
-## 📱 Compatibilité
+## 🔧 Mode Debug UI (Web uniquement)
 
-- ✅ Chrome/Edge (dernières versions)
-- ✅ Firefox (dernières versions)
-- ✅ Safari (dernières versions)
-- ✅ Mobile iOS/Android
-
-## 🧪 Tests Manuels
-
-Checklist de validation avant déploiement :
-
-- [ ] Le formulaire s'affiche correctement sur mobile
-- [ ] Le formulaire s'affiche correctement sur desktop (>768px)
-- [ ] La validation du champ Jira ID fonctionne (message d'erreur si vide)
-- [ ] Le bouton se désactive pendant l'envoi
-- [ ] Le spinner de chargement s'affiche
-- [ ] Le message de succès s'affiche après réponse positive
-- [ ] Le message d'erreur s'affiche en cas d'échec
-- [ ] Le formulaire se réinitialise après succès (2 secondes)
-- [ ] Le focus revient sur le premier champ après reset
-- [ ] Les états hover/focus sont visibles sur tous les éléments interactifs
-
-## 🔧 Mode Debug UI
-
-Un mode debug est disponible pour faciliter le développement et les tests CSS. Il permet d'afficher les différents écrans de l'application avec des données mockées sans avoir à exécuter le workflow complet.
+Un mode debug est disponible pour faciliter le développement CSS.
 
 ### Activation
-
-Ajoutez `?debug=true` à l'URL :
 
 ```
 http://localhost:3000?debug=true
 ```
 
-Un bandeau de debug apparaît en bas de l'écran avec des boutons pour naviguer entre les écrans.
-
 ### Accès direct à un écran
-
-Vous pouvez ouvrir directement un écran spécifique via l'URL :
 
 | URL | Description |
 |-----|-------------|
-| `?debug=loading` | Écran de chargement (génération en cours) |
-| `?debug=review` | Écran de revue avec 3 test cases mockés |
-| `?debug=review&n=10` | Écran de revue avec 10 test cases |
-| `?debug=injection` | Écran d'injection (étape initiale) |
-| `?debug=injection&step=1` | Injection - étape 1 terminée |
-| `?debug=injection&step=2` | Injection - terminée avec succès |
+| `?debug=loading` | Écran de chargement |
+| `?debug=review` | Revue avec 3 test cases |
+| `?debug=review&n=10` | Revue avec 10 test cases |
+| `?debug=injection` | Injection - en cours |
+| `?debug=injection&step=2` | Injection - terminée |
 
 ### Commandes Console
 
-En mode debug, l'objet `debugUI` est exposé dans la console :
-
 ```javascript
-// Afficher les différents écrans
-debugUI.showForm()           // Formulaire initial
-debugUI.showLoading()        // Écran de chargement
+debugUI.showForm()           // Formulaire
+debugUI.showLoading()        // Chargement
 debugUI.showReview(5)        // Revue avec 5 test cases
-debugUI.showReview(10)       // Revue avec 10 test cases (test scroll)
-debugUI.showInjection(0)     // Injection - en cours
-debugUI.showInjection(1)     // Injection - étape 1 OK
-debugUI.showInjection(2)     // Injection - terminée
-
-// Utilitaires
-debugUI.setEditing(0)        // Active l'édition du test case #1
-debugUI.getState()           // Affiche l'état actuel du composant
-debugUI.getMockTestCases(5)  // Retourne 5 test cases mockés (sans changer l'UI)
+debugUI.showInjection(2)     // Injection terminée
+debugUI.setEditing(0)        // Mode édition test case #1
+debugUI.getState()           // État actuel
 ```
 
-### Données mockées
+## 📦 Déploiement
 
-Les test cases mockés incluent :
-- Des titres de longueurs variées
-- Du contenu Gherkin réaliste
-- Différents types (Cucumber, Manual)
-- Un test case désélectionné (pour tester le style `.deselected`)
+### Web App sur Netlify
 
-### Exemple de workflow debug
+1. Build : `npm run build:web`
+2. Déployer le contenu de `dist/web/` sur Netlify
 
-1. Ouvrir `http://localhost:3000?debug=review&n=5`
-2. Inspecter les styles de `.review-card`
-3. Dans la console : `debugUI.setEditing(0)` pour tester le mode édition
-4. Ajuster le CSS
-5. `debugUI.showInjection(2)` pour vérifier l'écran de succès
+Ou via GitHub :
+- Build command : `npm run build:web`
+- Publish directory : `dist/web`
+
+### Extension Chrome
+
+1. Build : `npm run build:extension`
+2. Zipper le contenu de `dist/extension/`
+3. Publier sur [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/devconsole)
 
 ## 🐛 Troubleshooting
 
 ### Erreur CORS
 
-**Problème :** `Access to fetch at '...' from origin '...' has been blocked by CORS policy`
+```
+Access to fetch at '...' has been blocked by CORS policy
+```
 
-**Solution :** Configurez les headers CORS sur votre workflow n8n (voir section Configuration n8n).
+**Solution :** Configurer les headers CORS sur votre workflow n8n.
 
-### Webhook n'est pas appelé
+### Extension : icônes manquantes
 
-**Problème :** Aucune requête n'est envoyée au webhook
+```
+Could not load icon
+```
 
-**Solution :**
-1. Ouvrez la console du navigateur (F12)
-2. Vérifiez les logs console (démarrent par 🚀, ✅ ou ❌)
-3. Vérifiez que `N8N_WEBHOOK_URL` est bien configurée dans `src/js/app.js`
+**Solution :** Ajouter les fichiers PNG requis dans `src/extension/assets/icons/`.
 
-### Le formulaire ne se réinitialise pas
+### Pusher ne reçoit pas les événements
 
-**Problème :** Le formulaire reste rempli après succès
+1. Vérifier la console pour les logs `📡`
+2. Vérifier que `PUSHER_APP_KEY` est correct dans `src/core/constants.js`
+3. Vérifier que n8n envoie bien sur le bon channel
 
-**Solution :** Vérifiez que le serveur n8n retourne un JSON valide avec `success: true`.
+## 📱 Compatibilité
 
-## 📸 Screenshots
+### Web App
+- ✅ Chrome/Edge (dernières versions)
+- ✅ Firefox (dernières versions)
+- ✅ Safari (dernières versions)
+- ✅ Mobile iOS/Android
 
-_TODO: Ajouter des captures d'écran après déploiement_
-
-- Screenshot mobile : ![Mobile view](#)
-- Screenshot desktop : ![Desktop view](#)
-- Screenshot états : ![States (loading/success/error)](#)
+### Extension Chrome
+- ✅ Chrome 90+
+- ✅ Edge (Chromium) 90+
 
 ## 🤝 Contribution
 
-Ce projet est un outil interne. Pour toute modification :
-
 1. Respectez les conventions définies dans `CLAUDE.md`
-2. Testez manuellement toutes les fonctionnalités
-3. Maintenez la compatibilité mobile/desktop
-4. Ne pas ajouter de dépendances npm ou frameworks externes
+2. Le code partagé va dans `src/core/`
+3. Le code spécifique web dans `src/web/`
+4. Le code spécifique extension dans `src/extension/`
+5. Testez les deux builds avant de commit
 
 ## 📄 Licence
 
 Propriété interne - Tous droits réservés
 
-## 📞 Support
-
-Pour toute question ou problème :
-- Consultez d'abord `CLAUDE.md` pour les détails techniques
-- Vérifiez les logs console du navigateur (F12)
-- Contactez l'équipe DevOps pour les problèmes n8n
-
 ---
 
-**Powered by n8n • Built with Alpine.js • Deployed on Netlify**
+**Powered by n8n • Built with Alpine.js & Vite • Web + Chrome Extension**

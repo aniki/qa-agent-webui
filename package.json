@@ -1,11 +1,15 @@
 {
   "name": "qa-testcase-generator",
   "version": "1.0.0",
-  "description": "Interface web pour déclencher des workflows n8n de génération de test cases QA",
+  "description": "Interface web et extension Chrome pour générer des test cases QA via n8n",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "dev:extension": "vite build --watch --config vite.config.extension.js",
+    "build": "npm run build:web",
+    "build:web": "vite build",
+    "build:extension": "vite build --config vite.config.extension.js",
+    "build:all": "npm run build:web && npm run build:extension",
     "preview": "vite preview"
   },
   "devDependencies": {
