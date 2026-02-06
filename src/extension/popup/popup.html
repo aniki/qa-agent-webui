@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-    <div class="popup-container" id="app">
+    <div class="popup-container" id="app" x-data="popupApp()" x-cloak>
         <!-- Header -->
         <header class="popup-header">
             <img src="../assets/icons/icon-48.png" alt="Logo" class="popup-logo">
@@ -15,7 +15,7 @@
         </header>
 
         <!-- Loading Overlay -->
-        <div id="loading-overlay" class="overlay hidden">
+        <div x-show="loading" class="overlay">
             <div class="overlay-content">
                 <div class="spinner"></div>
                 <p class="overlay-text">Génération des test cases en cours...</p>
@@ -24,67 +24,77 @@
         </div>
 
         <!-- Injection Overlay -->
-        <div id="injection-overlay" class="overlay hidden">
+        <div x-show="injecting" class="overlay">
             <div class="overlay-content">
                 <h3 class="overlay-title">Injection dans Xray</h3>
                 <div class="progress-steps">
-                    <div class="step" id="step-insert">
+                    <div class="step" :class="{'active': !injectionSteps.testsInserted, 'completed': injectionSteps.testsInserted}">
                         <div class="step-indicator">1</div>
                         <span>Insertion</span>
                     </div>
-                    <div class="step-line"></div>
-                    <div class="step" id="step-link">
+                    <div class="step-line" :class="{'completed': injectionSteps.testsInserted}"></div>
+                    <div class="step" :class="{'active': injectionSteps.testsInserted && !injectionSteps.testsLinked, 'completed': injectionSteps.testsLinked}">
                         <div class="step-indicator">2</div>
                         <span>Liaison US</span>
                     </div>
                 </div>
                 <div class="progress-bar">
-                    <div class="progress-fill" id="progress-fill"></div>
+                    <div class="progress-fill" :style="`width: ${injectionProgress}%`"></div>
                 </div>
-                <div id="injection-success" class="success-message hidden">
+                <div x-show="injectionSteps.testsLinked" class="success-message">
                     <p>Test cases injectés avec succès !</p>
-                    <button id="btn-new-tests" class="btn btn-primary">Nouveau</button>
+                    <button @click="resetAll()" class="btn btn-primary">Nouveau</button>
                 </div>
             </div>
         </div>
 
         <!-- Review Mode -->
-        <div id="review-container" class="hidden">
+        <div x-show="reviewMode" x-cloak>
             <div class="review-header">
                 <h3>Revue des test cases</h3>
-                <p class="review-count"><span id="review-count">0</span> test case(s) pour <strong id="review-jira-key"></strong></p>
+                <p class="review-count"><span x-text="testCases.length"></span> test case(s) pour <strong x-text="jiraKey"></strong></p>
             </div>
-            <div id="test-cases-list" class="test-cases-list">
-                <!-- Test cases will be inserted here -->
+            <div class="test-cases-list">
+                <template x-for="(tc, index) in testCases" :key="index">
+                    <div class="test-case-card" :class="{'deselected': !tc.selected}">
+                        <div class="test-case-header">
+                            <input type="checkbox" class="test-case-checkbox" x-model="tc.selected">
+                            <span class="test-case-number" x-text="`#${index + 1}`"></span>
+                            <span class="test-case-title" :title="tc._displayTitle" x-text="tc._displayTitle"></span>
+                            <span class="test-case-type" x-text="tc._displayType"></span>
+                        </div>
+                        <div class="test-case-preview" x-text="tc._displaySteps.split('\n')[0]"></div>
+                    </div>
+                </template>
             </div>
             <div class="review-actions">
-                <button id="btn-cancel-review" class="btn btn-secondary">Annuler</button>
+                <button @click="cancelReview()" class="btn btn-secondary">Annuler</button>
                 <div class="review-actions-right">
-                    <span id="selection-count">0/0</span>
-                    <button id="btn-inject" class="btn btn-primary">Injecter</button>
+                    <span x-text="`${selectedCount}/${testCases.length}`"></span>
+                    <button @click="handleInject()" class="btn btn-primary" :disabled="selectedCount === 0">Injecter</button>
                 </div>
             </div>
         </div>
 
         <!-- Form -->
-        <form id="generate-form" class="popup-form">
+        <form @submit.prevent="handleSubmit()" class="popup-form" x-show="!reviewMode && !injecting">
             <!-- Auto-detected Jira info -->
-            <div id="jira-detected" class="jira-detected hidden">
+            <div x-show="jiraDetected" class="jira-detected">
                 <span class="jira-badge">Auto-détecté</span>
-                <span id="detected-jira-key" class="detected-key"></span>
+                <span class="detected-key" x-text="detectedJiraKeyDisplay"></span>
             </div>
 
             <!-- Jira ID Field -->
             <div class="form-group">
                 <label for="jira-key">Jira User Story ID *</label>
-                <input type="text" id="jira-key" name="jira-key" placeholder="HOTEL-123" required>
-                <p id="jira-error" class="error-message hidden">Le champ Jira ID est obligatoire</p>
+                <input type="text" id="jira-key" name="jira-key" placeholder="HOTEL-123" x-model="jiraKey" required>
+                <p x-show="showJiraError" class="error-message">Le champ Jira ID est obligatoire</p>
             </div>
 
             <!-- Format Field -->
             <div class="form-group">
                 <label for="format">Format de sortie</label>
-                <select id="format" name="format">
+                <select id="format" name="format" x-model="format" @change="savePreferences()">
                     <option value="gherkin">Gherkin</option>
                     <option value="step-by-step">Step-by-step</option>
                 </select>
@@ -93,19 +103,19 @@
             <!-- Prompt Field -->
             <div class="form-group">
                 <label for="prompt">Instruction complémentaire</label>
-                <textarea id="prompt" name="prompt" rows="2" placeholder="Ex: Inclure les tests de validation..."></textarea>
+                <textarea id="prompt" name="prompt" rows="2" placeholder="Ex: Inclure les tests de validation..." x-model="prompt"></textarea>
             </div>
 
             <!-- Messages -->
-            <div id="message-success" class="message message-success hidden">
-                <p></p>
+            <div x-show="successMessage" class="message message-success">
+                <p x-text="successMessage"></p>
             </div>
-            <div id="message-error" class="message message-error hidden">
-                <p></p>
+            <div x-show="errorMessage" class="message message-error">
+                <p x-text="errorMessage"></p>
             </div>
 
             <!-- Submit Button -->
-            <button type="submit" id="btn-submit" class="btn btn-primary btn-full">
+            <button type="submit" class="btn btn-primary btn-full" :disabled="loading">
                 Générer les test cases
             </button>
         </form>

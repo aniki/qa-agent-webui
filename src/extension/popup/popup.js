@@ -1,10 +1,10 @@
 // ============================================
 // QA Test Cases Generator - Chrome Extension Popup
-// Main popup logic using core modules
+// Main popup logic using Alpine.js and core modules
 // ============================================
 
+import Alpine from 'alpinejs';
 import {
-    DEBUG_MODE,
     getChannelId,
     initializePusher,
     getPusherChannel,
@@ -17,389 +17,216 @@ import {
     cleanTestCasesForXray
 } from '../../core/index.js';
 
-// ============================================
-// State Management
-// ============================================
+window.Alpine = Alpine;
 
-const state = {
-    channelId: getChannelId(),
-    jiraKey: '',
-    format: 'gherkin',
-    prompt: '',
-    testCases: [],
-    loading: false,
-    injecting: false,
-    reviewMode: false,
-    injectionSteps: {
-        testsInserted: false,
-        testsLinked: false
-    }
-};
+document.addEventListener('alpine:init', () => {
+    Alpine.data('popupApp', () => ({
+        // State
+        channelId: getChannelId(),
+        jiraKey: '',
+        format: 'gherkin',
+        prompt: '',
+        testCases: [],
+        loading: false,
+        injecting: false,
+        reviewMode: false,
+        jiraDetected: false,
+        detectedJiraKey: '',
+        showJiraError: false,
+        successMessage: '',
+        errorMessage: '',
+        injectionSteps: {
+            testsInserted: false,
+            testsLinked: false
+        },
 
-// ============================================
-// DOM Elements
-// ============================================
+        // Computed
+        get selectedCount() {
+            return this.testCases.filter(tc => tc.selected).length;
+        },
 
-const elements = {
-    form: document.getElementById('generate-form'),
-    jiraKeyInput: document.getElementById('jira-key'),
-    formatSelect: document.getElementById('format'),
-    promptTextarea: document.getElementById('prompt'),
-    btnSubmit: document.getElementById('btn-submit'),
-    jiraDetected: document.getElementById('jira-detected'),
-    detectedJiraKey: document.getElementById('detected-jira-key'),
-    jiraError: document.getElementById('jira-error'),
-    messageSuccess: document.getElementById('message-success'),
-    messageError: document.getElementById('message-error'),
-    loadingOverlay: document.getElementById('loading-overlay'),
-    injectionOverlay: document.getElementById('injection-overlay'),
-    reviewContainer: document.getElementById('review-container'),
-    testCasesList: document.getElementById('test-cases-list'),
-    reviewCount: document.getElementById('review-count'),
-    reviewJiraKey: document.getElementById('review-jira-key'),
-    selectionCount: document.getElementById('selection-count'),
-    btnCancelReview: document.getElementById('btn-cancel-review'),
-    btnInject: document.getElementById('btn-inject'),
-    btnNewTests: document.getElementById('btn-new-tests'),
-    stepInsert: document.getElementById('step-insert'),
-    stepLink: document.getElementById('step-link'),
-    progressFill: document.getElementById('progress-fill'),
-    injectionSuccess: document.getElementById('injection-success')
-};
+        get injectionProgress() {
+            const { testsInserted, testsLinked } = this.injectionSteps;
+            return testsLinked ? 100 : testsInserted ? 50 : 0;
+        },
 
-// ============================================
-// Initialize
-// ============================================
+        get detectedJiraKeyDisplay() {
+            return this.detectedJiraKey;
+        },
 
-async function init() {
-    console.log('🚀 Popup initialized');
-    console.log('📡 Channel ID:', state.channelId);
+        // Init
+        async init() {
+            console.log('🚀 Popup initialized with Alpine.js');
+            console.log('📡 Channel ID:', this.channelId);
 
-    // Initialize Pusher
-    initializePusher(state.channelId);
-    setupPusherEvents();
+            // Initialize Pusher
+            initializePusher(this.channelId);
+            this.setupPusherEvents();
 
-    // Setup event listeners
-    setupEventListeners();
+            // Try to auto-detect Jira key from active tab
+            await this.detectJiraFromTab();
 
-    // Try to auto-detect Jira key from active tab
-    await detectJiraFromTab();
+            // Load saved preferences from storage
+            await this.loadPreferences();
+        },
 
-    // Load saved preferences from storage
-    await loadPreferences();
-}
+        setupPusherEvents() {
+            const channel = getPusherChannel();
+            if (!channel) {
+                console.error('❌ Pusher channel not available');
+                return;
+            }
 
-// ============================================
-// Pusher Events
-// ============================================
+            // Test cases generated - show review
+            bindPusherEvent('cases-generated', (data) => {
+                console.log('📝 Test cases generated:', data);
+                const rawTestCases = parseTestCasesFromPusher(data);
+                this.testCases = transformTestCasesForUI(rawTestCases);
+                this.loading = false;
+                this.reviewMode = true;
+            });
 
-function setupPusherEvents() {
-    const channel = getPusherChannel();
-    if (!channel) {
-        console.error('❌ Pusher channel not available');
-        return;
-    }
+            // Tests inserted in Xray
+            bindPusherEvent('tests-inserted', (data) => {
+                console.log('💾 Tests inserted:', data);
+                this.injectionSteps.testsInserted = true;
+            });
 
-    // Test cases generated - show review
-    bindPusherEvent('cases-generated', (data) => {
-        console.log('📝 Test cases generated:', data);
-        const rawTestCases = parseTestCasesFromPusher(data);
-        state.testCases = transformTestCasesForUI(rawTestCases);
-        showReview();
-    });
+            // Tests linked (injection complete)
+            bindPusherEvent('xray-injected', (data) => {
+                console.log('🔗 Tests linked:', data);
+                this.injectionSteps.testsLinked = true;
+                this.showNativeNotification();
+            });
 
-    // Tests inserted in Xray
-    bindPusherEvent('tests-inserted', (data) => {
-        console.log('💾 Tests inserted:', data);
-        state.injectionSteps.testsInserted = true;
-        updateInjectionProgress();
-    });
+            // Error event
+            bindPusherEvent('test-error', (data) => {
+                console.log('❌ Error:', data);
+                this.loading = false;
+                this.errorMessage = data.message || 'Une erreur est survenue';
+            });
+        },
 
-    // Tests linked (injection complete)
-    bindPusherEvent('xray-injected', (data) => {
-        console.log('🔗 Tests linked:', data);
-        state.injectionSteps.testsLinked = true;
-        updateInjectionProgress();
-        showInjectionSuccess();
-    });
+        // Actions
+        async handleSubmit() {
+            if (!this.jiraKey.trim()) {
+                this.showJiraError = true;
+                return;
+            }
 
-    // Error event
-    bindPusherEvent('test-error', (data) => {
-        console.log('❌ Error:', data);
-        hideLoading();
-        showError(data.message || 'Une erreur est survenue');
-    });
-}
+            this.showJiraError = false;
+            this.successMessage = '';
+            this.errorMessage = '';
+            this.loading = true;
 
-// ============================================
-// Event Listeners
-// ============================================
+            try {
+                await generateTestCases({
+                    jira_key: this.jiraKey,
+                    format: this.format,
+                    prompt: this.prompt,
+                    user_agent: 'chrome_extension',
+                    channel_id: this.channelId
+                });
+                // Response will come via Pusher
+            } catch (err) {
+                console.error('❌ Error:', err);
+                this.loading = false;
+                this.errorMessage = formatApiError(err);
+            }
+        },
 
-function setupEventListeners() {
-    // Form submission
-    elements.form.addEventListener('submit', handleSubmit);
+        async handleInject() {
+            const selectedTestCases = this.testCases.filter(tc => tc.selected);
+            if (selectedTestCases.length === 0) return;
 
-    // Review actions
-    elements.btnCancelReview.addEventListener('click', cancelReview);
-    elements.btnInject.addEventListener('click', handleInject);
-    elements.btnNewTests.addEventListener('click', resetAll);
+            this.injecting = true;
+            this.reviewMode = false;
+            this.injectionSteps = { testsInserted: false, testsLinked: false };
 
-    // Save preferences on change
-    elements.formatSelect.addEventListener('change', savePreferences);
-}
+            try {
+                const xrayTestCases = cleanTestCasesForXray(selectedTestCases);
+                await injectTestCases(this.jiraKey, this.channelId, xrayTestCases);
+                // Progress will update via Pusher events
+            } catch (err) {
+                console.error('❌ Injection error:', err);
+                this.injecting = false;
+                this.reviewMode = true;
+                this.errorMessage = formatApiError(err);
+            }
+        },
 
-// ============================================
-// Form Handling
-// ============================================
+        cancelReview() {
+            this.reviewMode = false;
+            this.testCases = [];
+        },
 
-async function handleSubmit(e) {
-    e.preventDefault();
+        resetAll() {
+            this.testCases = [];
+            this.reviewMode = false;
+            this.injecting = false;
+            this.injectionSteps = { testsInserted: false, testsLinked: false };
+            this.jiraKey = '';
+            this.prompt = '';
+            this.successMessage = '';
+            this.errorMessage = '';
+        },
 
-    const jiraKey = elements.jiraKeyInput.value.trim();
-    if (!jiraKey) {
-        elements.jiraError.classList.remove('hidden');
-        return;
-    }
+        async detectJiraFromTab() {
+            try {
+                if (typeof chrome === 'undefined' || !chrome.tabs) return;
 
-    elements.jiraError.classList.add('hidden');
-    hideMessages();
+                const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+                if (!tab?.url) return;
 
-    state.jiraKey = jiraKey;
-    state.format = elements.formatSelect.value;
-    state.prompt = elements.promptTextarea.value;
+                const match = tab.url.match(/atlassian\.net\/browse\/([A-Z]+-\d+)/i);
+                if (match) {
+                    const key = match[1].toUpperCase();
+                    this.detectedJiraKey = key;
+                    this.jiraDetected = true;
+                    this.jiraKey = key;
+                    console.log('🎯 Auto-detected Jira key:', key);
+                }
+            } catch (err) {
+                console.log('Could not detect Jira key from tab:', err);
+            }
+        },
 
-    showLoading();
+        async loadPreferences() {
+            try {
+                if (typeof chrome === 'undefined' || !chrome.storage) return;
 
-    try {
-        await generateTestCases({
-            jira_key: state.jiraKey,
-            format: state.format,
-            prompt: state.prompt,
-            user_agent: 'chrome_extension',
-            channel_id: state.channelId
-        });
-        // Response will come via Pusher
-    } catch (err) {
-        console.error('❌ Error:', err);
-        hideLoading();
-        showError(formatApiError(err));
-    }
-}
+                const result = await chrome.storage.local.get(['format']);
+                if (result.format) {
+                    this.format = result.format;
+                }
+            } catch (err) {
+                console.log('Could not load preferences:', err);
+            }
+        },
 
-// ============================================
-// Review Mode
-// ============================================
+        async savePreferences() {
+            try {
+                if (typeof chrome === 'undefined' || !chrome.storage) return;
 
-function showReview() {
-    hideLoading();
-    state.reviewMode = true;
+                await chrome.storage.local.set({
+                    format: this.format
+                });
+            } catch (err) {
+                console.log('Could not save preferences:', err);
+            }
+        },
 
-    elements.form.classList.add('hidden');
-    elements.reviewContainer.classList.remove('hidden');
-    elements.reviewJiraKey.textContent = state.jiraKey;
-    elements.reviewCount.textContent = state.testCases.length;
-
-    renderTestCases();
-    updateSelectionCount();
-}
-
-function renderTestCases() {
-    elements.testCasesList.innerHTML = state.testCases.map((tc, index) => `
-        <div class="test-case-card ${tc.selected ? '' : 'deselected'}" data-index="${index}">
-            <div class="test-case-header">
-                <input type="checkbox" class="test-case-checkbox" ${tc.selected ? 'checked' : ''} data-index="${index}">
-                <span class="test-case-number">#${index + 1}</span>
-                <span class="test-case-title" title="${tc._displayTitle}">${tc._displayTitle}</span>
-                <span class="test-case-type">${tc._displayType}</span>
-            </div>
-            <div class="test-case-preview">${tc._displaySteps.split('\n')[0]}</div>
-        </div>
-    `).join('');
-
-    // Add checkbox listeners
-    elements.testCasesList.querySelectorAll('.test-case-checkbox').forEach(checkbox => {
-        checkbox.addEventListener('change', (e) => {
-            const index = parseInt(e.target.dataset.index);
-            state.testCases[index].selected = e.target.checked;
-            const card = e.target.closest('.test-case-card');
-            card.classList.toggle('deselected', !e.target.checked);
-            updateSelectionCount();
-        });
-    });
-}
-
-function updateSelectionCount() {
-    const selected = state.testCases.filter(tc => tc.selected).length;
-    elements.selectionCount.textContent = `${selected}/${state.testCases.length}`;
-    elements.btnInject.disabled = selected === 0;
-}
-
-function cancelReview() {
-    state.reviewMode = false;
-    state.testCases = [];
-    elements.reviewContainer.classList.add('hidden');
-    elements.form.classList.remove('hidden');
-}
-
-// ============================================
-// Injection
-// ============================================
-
-async function handleInject() {
-    const selectedTestCases = state.testCases.filter(tc => tc.selected);
-    if (selectedTestCases.length === 0) return;
-
-    state.injecting = true;
-    state.injectionSteps = { testsInserted: false, testsLinked: false };
-
-    elements.reviewContainer.classList.add('hidden');
-    showInjectionOverlay();
-
-    try {
-        const xrayTestCases = cleanTestCasesForXray(selectedTestCases);
-        await injectTestCases(state.jiraKey, state.channelId, xrayTestCases);
-        // Progress will update via Pusher events
-    } catch (err) {
-        console.error('❌ Injection error:', err);
-        hideInjectionOverlay();
-        elements.reviewContainer.classList.remove('hidden');
-        showError(formatApiError(err));
-    }
-}
-
-function showInjectionOverlay() {
-    elements.injectionOverlay.classList.remove('hidden');
-    elements.injectionSuccess.classList.add('hidden');
-    updateInjectionProgress();
-}
-
-function hideInjectionOverlay() {
-    elements.injectionOverlay.classList.add('hidden');
-}
-
-function updateInjectionProgress() {
-    const { testsInserted, testsLinked } = state.injectionSteps;
-
-    elements.stepInsert.classList.toggle('active', !testsInserted);
-    elements.stepInsert.classList.toggle('completed', testsInserted);
-    elements.stepLink.classList.toggle('active', testsInserted && !testsLinked);
-    elements.stepLink.classList.toggle('completed', testsLinked);
-
-    const progress = testsLinked ? 100 : testsInserted ? 50 : 0;
-    elements.progressFill.style.width = `${progress}%`;
-}
-
-function showInjectionSuccess() {
-    elements.injectionSuccess.classList.remove('hidden');
-
-    // Send notification
-    if (chrome?.notifications) {
-        chrome.notifications.create({
-            type: 'basic',
-            iconUrl: '../assets/icons/icon-128.png',
-            title: 'Test Cases Injectés',
-            message: `${state.testCases.filter(tc => tc.selected).length} test cases ont été créés dans Xray`
-        });
-    }
-}
-
-// ============================================
-// UI Helpers
-// ============================================
-
-function showLoading() {
-    state.loading = true;
-    elements.loadingOverlay.classList.remove('hidden');
-    elements.btnSubmit.disabled = true;
-}
-
-function hideLoading() {
-    state.loading = false;
-    elements.loadingOverlay.classList.add('hidden');
-    elements.btnSubmit.disabled = false;
-}
-
-function showError(message) {
-    elements.messageError.querySelector('p').textContent = message;
-    elements.messageError.classList.remove('hidden');
-}
-
-function showSuccess(message) {
-    elements.messageSuccess.querySelector('p').textContent = message;
-    elements.messageSuccess.classList.remove('hidden');
-}
-
-function hideMessages() {
-    elements.messageError.classList.add('hidden');
-    elements.messageSuccess.classList.add('hidden');
-}
-
-function resetAll() {
-    state.testCases = [];
-    state.reviewMode = false;
-    state.injecting = false;
-    state.injectionSteps = { testsInserted: false, testsLinked: false };
-
-    hideInjectionOverlay();
-    elements.reviewContainer.classList.add('hidden');
-    elements.form.classList.remove('hidden');
-    elements.jiraKeyInput.value = '';
-    elements.promptTextarea.value = '';
-    hideMessages();
-}
-
-// ============================================
-// Jira Auto-Detection
-// ============================================
-
-async function detectJiraFromTab() {
-    try {
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        if (!tab?.url) return;
-
-        // Match Jira URLs: https://xxx.atlassian.net/browse/PROJ-123
-        const match = tab.url.match(/atlassian\.net\/browse\/([A-Z]+-\d+)/i);
-        if (match) {
-            const jiraKey = match[1].toUpperCase();
-            elements.detectedJiraKey.textContent = jiraKey;
-            elements.jiraDetected.classList.remove('hidden');
-            elements.jiraKeyInput.value = jiraKey;
-            state.jiraKey = jiraKey;
-            console.log('🎯 Auto-detected Jira key:', jiraKey);
+        showNativeNotification() {
+            if (typeof chrome !== 'undefined' && chrome.notifications) {
+                chrome.notifications.create({
+                    type: 'basic',
+                    iconUrl: '../assets/icons/icon-128.png',
+                    title: 'Test Cases Injectés',
+                    message: `${this.selectedCount} test cases ont été créés dans Xray`
+                });
+            }
         }
-    } catch (err) {
-        console.log('Could not detect Jira key from tab:', err);
-    }
-}
+    }));
+});
 
-// ============================================
-// Storage
-// ============================================
-
-async function loadPreferences() {
-    try {
-        const result = await chrome.storage.local.get(['format']);
-        if (result.format) {
-            elements.formatSelect.value = result.format;
-            state.format = result.format;
-        }
-    } catch (err) {
-        console.log('Could not load preferences:', err);
-    }
-}
-
-async function savePreferences() {
-    try {
-        await chrome.storage.local.set({
-            format: elements.formatSelect.value
-        });
-    } catch (err) {
-        console.log('Could not save preferences:', err);
-    }
-}
-
-// ============================================
-// Start
-// ============================================
-
-document.addEventListener('DOMContentLoaded', init);
+Alpine.start();

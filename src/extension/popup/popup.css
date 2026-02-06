@@ -459,3 +459,7 @@ body {
 .hidden {
     display: none !important;
 }
+
+[x-cloak] {
+    display: none !important;
+}
