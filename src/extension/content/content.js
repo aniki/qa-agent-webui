@@ -85,9 +85,9 @@
         });
 
         button.addEventListener('click', () => {
-            // Send message to open extension popup with pre-filled data
+            // Send message to open side panel with pre-filled data
             chrome.runtime.sendMessage({
-                type: 'OPEN_POPUP_WITH_JIRA',
+                type: 'OPEN_SIDE_PANEL',
                 jiraKey: jiraKey,
                 title: getIssueTitle()
             });

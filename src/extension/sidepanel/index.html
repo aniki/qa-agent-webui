@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QA Test Cases Generator</title>
+    <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+    <div class="sidepanel-container" id="app" x-data="sidePanelApp()" x-cloak>
+        <!-- Header -->
+        <header class="sidepanel-header">
+            <div class="header-content">
+                <img src="../assets/icons/icon-48.png" alt="Logo" class="header-logo">
+                <div class="header-text">
+                    <h1 class="header-title">Test Cases Generator</h1>
+                    <p class="header-subtitle">Génération automatique via IA</p>
+                </div>
+            </div>
+            <div class="header-status" x-show="channelId">
+                <span class="status-dot" :class="{'connected': pusherConnected}"></span>
+                <span class="status-text" x-text="connectionStatusText"></span>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="sidepanel-main">
+            <!-- Loading Overlay - Génération -->
+            <template x-if="showLoadingOverlay">
+                <div class="overlay">
+                    <div class="overlay-content">
+                        <div class="loader">
+                            <div class="spinner"></div>
+                        </div>
+                        <h3 class="overlay-title">Génération en cours</h3>
+                        <p class="overlay-text">L'IA analyse votre User Story et rédige les test cases...</p>
+                        <p class="overlay-subtext">Cela peut prendre 1 à 2 minutes</p>
+                        <div class="overlay-info">
+                            <span class="info-icon">📡</span>
+                            <span>Vous pouvez continuer à naviguer, le panneau reste ouvert</span>
+                        </div>
+                    </div>
+                </div>
+            </template>
+
+            <!-- Injection Overlay -->
+            <template x-if="showInjectionOverlay">
+                <div class="overlay">
+                    <div class="overlay-content">
+                        <h3 class="overlay-title">Injection dans Xray</h3>
+
+                        <div class="progress-steps">
+                            <div class="step" :class="step1Classes">
+                                <div class="step-circle">
+                                    <span x-show="!injectionSteps.testsInserted">1</span>
+                                    <svg x-show="injectionSteps.testsInserted" class="step-check" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3">
+                                        <polyline points="12 5 6 11 3 8"></polyline>
+                                    </svg>
+                                </div>
+                                <div class="step-info">
+                                    <span class="step-label">Insertion dans Xray</span>
+                                    <span class="step-status" x-text="step1StatusText"></span>
+                                </div>
+                            </div>
+
+                            <div class="step-connector" :class="connectorClasses"></div>
+
+                            <div class="step" :class="step2Classes">
+                                <div class="step-circle">
+                                    <span x-show="!injectionSteps.testsLinked">2</span>
+                                    <svg x-show="injectionSteps.testsLinked" class="step-check" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3">
+                                        <polyline points="12 5 6 11 3 8"></polyline>
+                                    </svg>
+                                </div>
+                                <div class="step-info">
+                                    <span class="step-label">Liaison User Story</span>
+                                    <span class="step-status" x-text="step2StatusText"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="progress-bar">
+                            <div class="progress-fill" :style="injectionProgressStyle"></div>
+                        </div>
+
+                        <template x-if="injectionSteps.testsLinked">
+                            <div class="success-section">
+                                <div class="success-icon">✅</div>
+                                <h4>Test cases injectés avec succès !</h4>
+                                <p>Les tests ont été créés dans Xray et liés à la User Story.</p>
+                                <button @click="resetAll()" class="btn btn-primary">Générer de nouveaux tests</button>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </template>
+
+            <!-- Review Mode -->
+            <template x-if="showReviewMode">
+            <div class="review-container">
+                <div class="review-header">
+                    <div class="review-title-section">
+                        <h2>Revue des test cases</h2>
+                        <p class="review-info">
+                            <span x-text="testCases.length"></span> test case(s) généré(s) pour
+                            <strong x-text="jiraKey"></strong>
+                        </p>
+                    </div>
+                    <div class="review-actions-top">
+                        <button @click="selectAllTestCases(true)" class="btn btn-sm btn-ghost">Tout sélectionner</button>
+                        <button @click="selectAllTestCases(false)" class="btn btn-sm btn-ghost">Tout désélectionner</button>
+                    </div>
+                </div>
+
+                <!-- Error in review mode -->
+                <div x-show="errorMessage" class="message message-error">
+                    <strong>Erreur</strong>
+                    <p x-text="errorMessage"></p>
+                </div>
+
+                <!-- Test Cases List -->
+                <div class="review-list">
+                    <template x-for="(testCase, index) in testCases" :key="testCase.id">
+                        <div class="review-card" :class="{'editing': testCase._isEditing, 'deselected': testCase._isDeselected}">
+                            <div class="review-card-header">
+                                <label class="checkbox-container">
+                                    <input type="checkbox" :checked="testCase.selected" @change="toggleTestCaseSelection(index)">
+                                    <span class="checkmark"></span>
+                                </label>
+                                <span class="card-number" x-text="testCase._cardNumber"></span>
+                                <span class="card-type" x-text="testCase._displayType"></span>
+                                <div class="card-actions">
+                                    <button x-show="!testCase._isEditing" @click="startEditing(index)" class="btn-icon" title="Modifier">
+                                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M11 4H4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-7"></path>
+                                            <path d="M12.5 2.5a1.5 1.5 0 0 1 2.12 2.12L8 11.24l-2.83.71.71-2.83 6.62-6.62z"></path>
+                                        </svg>
+                                    </button>
+                                    <button @click="deleteTestCase(index)" class="btn-icon btn-danger" title="Supprimer">
+                                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                                            <polyline points="3 6 5 6 14 6"></polyline>
+                                            <path d="M13 6v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6m2 0V4a2 2 0 0 1 2-2h1a2 2 0 0 1 2 2v2"></path>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- View Mode -->
+                            <div x-show="!testCase._isEditing" class="review-card-content">
+                                <h4 class="card-title" x-text="testCase.fields.summary"></h4>
+                                <pre class="card-gherkin" x-text="testCase.xray_gherkin_def"></pre>
+                            </div>
+
+                            <!-- Edit Mode -->
+                            <div x-show="testCase._isEditing" class="review-card-edit">
+                                <div class="edit-field">
+                                    <label>Titre (Summary)</label>
+                                    <input type="text" x-model="editTitle" class="form-input">
+                                </div>
+                                <div class="edit-field">
+                                    <label>Définition Gherkin</label>
+                                    <textarea x-model="editSteps" class="form-textarea" rows="8"></textarea>
+                                </div>
+                                <div class="edit-actions">
+                                    <button @click="cancelEditing()" class="btn btn-secondary">Annuler</button>
+                                    <button @click="saveEditing(index)" class="btn btn-primary">Enregistrer</button>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+
+                    <div x-show="hasNoTestCases" class="empty-state">
+                        <p>Aucun test case n'a été généré.</p>
+                    </div>
+                </div>
+
+                <!-- Review Footer Actions -->
+                <div class="review-footer">
+                    <div class="review-footer-left">
+                        <button @click="cancelReview()" class="btn btn-secondary">Annuler</button>
+                        <button @click="regenerateTestCases()" class="btn btn-secondary">Régénérer</button>
+                    </div>
+                    <div class="review-footer-right">
+                        <span class="selection-count" x-text="selectionCountText"></span>
+                        <button @click="handleInject()" class="btn btn-primary" :disabled="noTestCasesSelected">
+                            Valider et injecter
+                        </button>
+                    </div>
+                </div>
+            </div>
+            </template>
+
+            <!-- Form Section -->
+            <template x-if="showFormSection">
+            <div class="form-section">
+                <!-- Messages -->
+                <div x-cloak x-show="successMessage" x-transition class="message message-success">
+                    <strong>Succès</strong>
+                    <p x-text="successMessage"></p>
+                </div>
+
+                <div x-cloak x-show="showErrorInForm" x-transition class="message message-error">
+                    <strong>Erreur</strong>
+                    <p x-text="errorMessage"></p>
+                </div>
+
+                <!-- Auto-detected Jira -->
+                <div x-cloak x-show="jiraDetected" class="jira-detected">
+                    <span class="jira-badge">Auto-détecté</span>
+                    <span class="jira-key" x-text="detectedJiraKey"></span>
+                </div>
+
+                <form @submit.prevent="handleSubmit()" class="form">
+                    <!-- Jira ID -->
+                    <div class="form-group">
+                        <label for="jira-key">Jira User Story ID <span class="required">*</span></label>
+                        <input type="text" id="jira-key" name="jira-key" x-model="jiraKey"
+                            placeholder="Ex: HOTEL-123" class="form-input"
+                            :class="{'input-error': showJiraError}" required>
+                        <p x-cloak x-show="showJiraError" class="field-error">Le champ Jira ID est obligatoire</p>
+                    </div>
+
+                    <!-- Format -->
+                    <div class="form-group">
+                        <label for="format">Format de sortie</label>
+                        <select id="format" name="format" x-model="format" class="form-select" @change="savePreferences()">
+                            <option value="gherkin">Gherkin</option>
+                            <option value="step-by-step">Step-by-step</option>
+                        </select>
+                    </div>
+
+                    <!-- Prompt -->
+                    <div class="form-group">
+                        <label for="prompt">Instruction complémentaire</label>
+                        <textarea id="prompt" name="prompt" x-model="prompt" rows="3" class="form-textarea"
+                            placeholder="Ex: Inclure les tests de validation des données, ajouter des cas limites..."></textarea>
+                    </div>
+
+                    <!-- Submit -->
+                    <button type="submit" class="btn btn-primary btn-full" :disabled="loading">
+                        <span x-show="!loading">Générer les test cases</span>
+                        <span x-show="loading" class="btn-loading">
+                            <span class="spinner-small"></span>
+                            Génération en cours...
+                        </span>
+                    </button>
+                </form>
+            </div>
+            </template>
+        </main>
+
+        <!-- Footer -->
+        <footer class="sidepanel-footer">
+            <p>Powered by <strong>n8n</strong> • Channel: <code x-text="channelIdShort"></code></p>
+        </footer>
+    </div>
+
+    <script src="sidepanel.js" type="module"></script>
+</body>
+</html>

@@ -20,15 +20,15 @@ function copyExtensionFiles() {
                 `${distDir}/manifest.json`
             )
 
-            // Copy popup files
-            mkdirSync(`${distDir}/popup`, { recursive: true })
+            // Copy sidepanel files
+            mkdirSync(`${distDir}/sidepanel`, { recursive: true })
             copyFileSync(
-                'src/extension/popup/popup.html',
-                `${distDir}/popup/popup.html`
+                'src/extension/sidepanel/index.html',
+                `${distDir}/sidepanel/index.html`
             )
             copyFileSync(
-                'src/extension/popup/popup.css',
-                `${distDir}/popup/popup.css`
+                'src/extension/sidepanel/sidepanel.css',
+                `${distDir}/sidepanel/sidepanel.css`
             )
 
             // Copy background files
@@ -77,13 +77,13 @@ export default defineConfig({
         emptyDirBeforeWrite: true,
         rollupOptions: {
             input: {
-                popup: resolve(__dirname, 'src/extension/popup/popup.js'),
+                sidepanel: resolve(__dirname, 'src/extension/sidepanel/sidepanel.js'),
                 'service-worker': resolve(__dirname, 'src/extension/background/service-worker.js')
             },
             output: {
                 entryFileNames: (chunkInfo) => {
-                    if (chunkInfo.name === 'popup') {
-                        return 'popup/popup.js'
+                    if (chunkInfo.name === 'sidepanel') {
+                        return 'sidepanel/sidepanel.js'
                     }
                     if (chunkInfo.name === 'service-worker') {
                         return 'background/service-worker.js'
